@@ -1,0 +1,12 @@
+[package]
+name = "rdicom-lite"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+clap = { version = "4.4", features = ["derive"] }      
+dicom-object = "0.5"                                  
+dicom = "0.8.0"
+anyhow = "1.0"                                       
+log = "0.4"
+env_logger = "0.11"   
