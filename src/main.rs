@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::{fs, path};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
@@ -55,6 +56,14 @@ enum TagFlags {
     Specific(Vec<String>),
 }
 
+/// Modes for exporting DICOM Metadata
+struct SerializableDicomEntry {
+    name: String,
+    tag: String,
+    vr: String,
+    value: String,
+}
+
 fn parse_tag_flags(s: &str) -> Result<TagFlags, String> {
     match s.to_lowercase().as_str() {
         "all" => Ok(TagFlags::All),
@@ -81,12 +90,19 @@ fn main() {
     match &cli.command {
         Commands::Tags(args) => {
             let files: Vec<String> = list_all_files(cli.path.as_str());
+            let mut export_data: Vec<SerializableDicomEntry> = Vec::new();
+            
+            let is_exportable = args.csv.is_some() || args.json.is_some();
 
             for f in files {
                 let path: &str = f.as_str();
                 println!("[{}]----", path);
-                let _ = tags(path, &args.kind);
+
+                export_data.extend(
+                    tags(path, &args.kind, is_exportable)
+                );
             }
+
         }
         Commands::View => {
             let files: Vec<String> = list_all_files(cli.path.as_str());
@@ -113,8 +129,12 @@ fn list_all_files(user_path: &str) -> Vec<String>{
     res
 }
 
-fn tags(path: &str, kind: &TagFlags) -> Result<(), Box<dyn std::error::Error>>{
-    let obj = open_file(path)?;
+fn tags(path: &str, kind: &TagFlags, to_display: bool) -> Vec<SerializableDicomEntry>{
+    let obj = match open_file(path) {
+        Ok(o) => o,
+        Err(_) => return Vec::new(),
+    };
+    let mut output: Vec<SerializableDicomEntry> = Vec::new();
     match kind {
         TagFlags::All => {
             for element in obj.into_iter() {
@@ -128,22 +148,31 @@ fn tags(path: &str, kind: &TagFlags) -> Result<(), Box<dyn std::error::Error>>{
                     .to_str()
                     .map(|cow| cow.into_owned())
                     .unwrap_or_else(|_| "[Binary]".to_string());
-            print_colorize(tag, vr.to_string(), value.as_str(), name);
+                output.push(
+                    SerializableDicomEntry { 
+                        name: name.to_string(),
+                        tag: format!("({} {})", tag.0, tag.1),
+                        vr: vr.to_string().to_string(),
+                        value: value.to_string() 
+                    }
+                );
+                if !to_display {
+                    print_colorize(tag, vr.to_string(),value.as_str(), name);
+                }
             }
-            return Ok(())
+            return output;
         },
         TagFlags::Short => {
-            short_tagging(&obj);
-            return Ok(())
+            return short_tagging(&obj, to_display);
         }
         TagFlags::Specific(keys) => {
-            specific_tagging(keys, &obj);
-            return Ok(())
+            return specific_tagging(keys, &obj, to_display);
         }
     };
 }
 
-fn short_tagging(obj: &FileDicomObject<InMemDicomObject<StandardDataDictionary>>){
+fn short_tagging(obj: &FileDicomObject<InMemDicomObject<StandardDataDictionary>>, to_display: bool) -> Vec<SerializableDicomEntry>{
+    let mut output: Vec<SerializableDicomEntry> = Vec::new();
     let short_tags = [
         Tag(0x0010, 0x0010), // PatientName
         Tag(0x0008, 0x0020), // StudyDate
@@ -162,12 +191,24 @@ fn short_tagging(obj: &FileDicomObject<InMemDicomObject<StandardDataDictionary>>
                 .to_str()
                 .map(|cow| cow.into_owned())
                 .unwrap_or_else(|_| "[Binary]".to_string());
-            print_colorize(*tag, vr.to_string(), value.as_str(), name);
+            output.push(
+                SerializableDicomEntry { 
+                    name: name.to_string(),
+                    tag: format!("({} {})", tag.0, tag.1),
+                    vr: vr.to_string().to_string(),
+                    value: value.to_string() 
+                }
+            );
+            if !to_display {
+                print_colorize(*tag, vr.to_string(),value.as_str(), name);
+            }
         }
     }
+    return output;
 }
 
-fn specific_tagging(input_kind: &[String], obj: &FileDicomObject<InMemDicomObject<StandardDataDictionary>>){
+fn specific_tagging(input_kind: &[String], obj: &FileDicomObject<InMemDicomObject<StandardDataDictionary>>, to_display: bool)-> Vec<SerializableDicomEntry>{
+    let mut output: Vec<SerializableDicomEntry> = Vec::new();
     for element in obj.into_iter() {
         let tag: Tag = element.header().tag;
         let name = StandardDataDictionary
@@ -181,10 +222,20 @@ fn specific_tagging(input_kind: &[String], obj: &FileDicomObject<InMemDicomObjec
                 .to_str()
                 .map(|cow| cow.into_owned())
                 .unwrap_or_else(|_| "[Binary]".to_string());
-            print_colorize(tag, vr.to_string(), value.as_str(), name);
+            output.push(
+                SerializableDicomEntry { 
+                    name: name.to_string(),
+                    tag: format!("({} {})", tag.0, tag.1),
+                    vr: vr.to_string().to_string(),
+                    value: value.to_string() 
+                }
+            );
+            if !to_display {
+                print_colorize(tag, vr.to_string(),value.as_str(), name);
+            }
         }
     }
-
+    return output;
 }
 
 fn print_colorize(tag: Tag, vr: &str, value: &str, name: &str){
