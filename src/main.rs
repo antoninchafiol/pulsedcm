@@ -1,10 +1,12 @@
 use std::{fs, path};
 use std::path::Path;
+use std::str::FromStr;
+
 use clap::{Parser, Subcommand};
+
 use dicom::object::open_file;
 use dicom::dictionary_std::StandardDataDictionary;
 use dicom::core::{DataDictionary, Tag};
-
 use dicom::object::{FileDicomObject, InMemDicomObject};
 
 #[derive(Parser)]
@@ -12,7 +14,7 @@ use dicom::object::{FileDicomObject, InMemDicomObject};
 #[command(about = "A CLI tool for handling DICOM files", long_about = None)]
 struct Cli {
     /// Path to the dcm file
-    #[arg(value_name = "PATH")]
+    #[arg(value_name = "PATH", default_value=".")]
     path: String,
 
     #[command(subcommand)]
@@ -23,19 +25,40 @@ struct Cli {
 enum Commands {
     /// Work with tags
     Tags {
-        #[arg(default_value = "all")]
-        kind: String,
+        #[arg(default_value = "all",
+            value_parser = parse_tag_flags)]
+        kind: TagFlags,
     },
     /// View a file
     View,
 }
 
-#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
-pub enum TagFlags {
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
+enum TagFlags {
     All,
     Short,
     /// Comma-separated list of specific DICOM tag keywords (e.g. PatientName,StudyDate)
-    Specific,
+    Specific(Vec<String>),
+}
+
+fn parse_tag_flags(s: &str) -> Result<TagFlags, String> {
+    match s.to_lowercase().as_str() {
+        "all" => Ok(TagFlags::All),
+        "short" => Ok(TagFlags::Short),
+        other => {
+            let keys = if other.is_empty() {
+                Vec::new()
+            } else {
+                other
+                    .split(',')
+                    .map(str::trim)
+                    .filter(|kw| !kw.is_empty())
+                    .map(String::from)
+                    .collect()
+            };
+            Ok(TagFlags::Specific(keys))
+        }
+    }
 }
 
 fn main() {
@@ -44,6 +67,7 @@ fn main() {
     match &cli.command {
         Commands::Tags { kind } => {
             let files: Vec<String> = list_all_files(cli.path.as_str());
+
             for f in files {
                 let path: &str = f.as_str();
                 println!("[{}]----", path);
@@ -75,13 +99,10 @@ fn list_all_files(user_path: &str) -> Vec<String>{
     res
 }
 
-fn tags(path: &str, kind: &str) -> Result<(), Box<dyn std::error::Error>>{
-    if Path::new(path).is_file() {
-
-    }
+fn tags(path: &str, kind: &TagFlags) -> Result<(), Box<dyn std::error::Error>>{
     let obj = open_file(path)?;
     match kind {
-        "all" => {
+        TagFlags::All => {
             for element in obj.into_iter() {
                 let tag: Tag = element.header().tag;
                 let vr = element.header().vr();
@@ -97,12 +118,12 @@ fn tags(path: &str, kind: &str) -> Result<(), Box<dyn std::error::Error>>{
             }
             return Ok(())
         },
-        "short" => {
+        TagFlags::Short => {
             short_tagging(&obj);
             return Ok(())
         }
-        other => {
-            specific_tagging(other, &obj);
+        TagFlags::Specific(keys) => {
+            specific_tagging(keys, &obj);
             return Ok(())
         }
     };
@@ -131,8 +152,8 @@ fn short_tagging(obj: &FileDicomObject<InMemDicomObject<StandardDataDictionary>>
         }
     }
 }
-fn specific_tagging(input_kind: &str, obj: &FileDicomObject<InMemDicomObject<StandardDataDictionary>>){
-    let output: Vec<&str> = input_kind.split(",").collect();
+
+fn specific_tagging(input_kind: &[String], obj: &FileDicomObject<InMemDicomObject<StandardDataDictionary>>){
     for element in obj.into_iter() {
         let tag: Tag = element.header().tag;
         let name = StandardDataDictionary
@@ -140,7 +161,7 @@ fn specific_tagging(input_kind: &str, obj: &FileDicomObject<InMemDicomObject<Sta
             .map(|entry| entry.alias)
             .unwrap_or("Unknown");
 
-        if output.contains(&name){
+        if input_kind.contains(&name.to_string()){
             let vr = element.header().vr();
             let value: String = element.value()
                 .to_str()
@@ -151,7 +172,6 @@ fn specific_tagging(input_kind: &str, obj: &FileDicomObject<InMemDicomObject<Sta
     }
 
 }
-
 
 fn print_colorize(tag: Tag, vr: &str, value: &str, name: &str){
     let color = if is_phi_tag(tag) {
@@ -181,7 +201,9 @@ fn print_colorize(tag: Tag, vr: &str, value: &str, name: &str){
 
 
 }
-pub fn is_phi_tag(tag: Tag) -> bool {
+
+
+fn is_phi_tag(tag: Tag) -> bool {
     matches!(tag,
         Tag(0x0010, 0x0010) // Patient's Name
         | Tag(0x0010, 0x0020) // Patient ID
@@ -199,7 +221,8 @@ pub fn is_phi_tag(tag: Tag) -> bool {
         | Tag(0x0038, 0x0400) // Patient's Institution Residence
     )
 }
-pub fn is_warning_tag(tag: Tag) -> bool {
+
+fn is_warning_tag(tag: Tag) -> bool {
     matches!(tag,
         Tag(0x0008, 0x0050) // Accession Number
         | Tag(0x0008, 0x0080) // Institution Name
