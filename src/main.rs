@@ -1,8 +1,8 @@
 use std::{fs, path};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
-use clap::{Parser, Subcommand};
+use clap::{Parser, Args, Subcommand};
 
 use dicom::object::open_file;
 use dicom::dictionary_std::StandardDataDictionary;
@@ -24,18 +24,32 @@ struct Cli {
 #[derive(Subcommand)]
 enum Commands {
     /// Work with tags
-    Tags {
-        #[arg(default_value = "all",
-            value_parser = parse_tag_flags)]
-        kind: TagFlags,
-    },
+    Tags(TagsArgs),
     /// View a file
     View,
 }
 
+#[derive(Args, Debug)]
+struct TagsArgs {
+    #[arg(
+        default_value = "all",
+        value_parser = parse_tag_flags)
+    ]
+    kind: TagFlags,
+
+    #[arg(long, value_name="FILE")]
+    json: Option<PathBuf>,
+    
+    #[arg(long, value_name="FILE")]
+    csv: Option<PathBuf>,
+    
+}
+
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
 enum TagFlags {
+    /// All tags
     All,
+    /// Important tags (Like PatientName, Modality, SeriesDescription)
     Short,
     /// Comma-separated list of specific DICOM tag keywords (e.g. PatientName,StudyDate)
     Specific(Vec<String>),
@@ -65,13 +79,13 @@ fn main() {
     let cli = Cli::parse();
 
     match &cli.command {
-        Commands::Tags { kind } => {
+        Commands::Tags(args) => {
             let files: Vec<String> = list_all_files(cli.path.as_str());
 
             for f in files {
                 let path: &str = f.as_str();
                 println!("[{}]----", path);
-                let _ = tags(path, kind);
+                let _ = tags(path, &args.kind);
             }
         }
         Commands::View => {
@@ -161,7 +175,7 @@ fn specific_tagging(input_kind: &[String], obj: &FileDicomObject<InMemDicomObjec
             .map(|entry| entry.alias)
             .unwrap_or("Unknown");
 
-        if input_kind.contains(&name.to_string()){
+        if input_kind.contains(&name.to_string().to_lowercase()){
             let vr = element.header().vr();
             let value: String = element.value()
                 .to_str()
