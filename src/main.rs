@@ -1,13 +1,9 @@
-use std::collections::HashMap;
-use std::error::Error;
 use std::fs::File;
-use std::io::Write;
-use std::{fs, path, io};
+use std::{fs};
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
-use std::str::FromStr;
-use serde_json::Serializer;
-use serde::{Deserialize, Serialize};
+
+use serde::Serialize;
 use csv::Writer;
 use clap::{Parser, Args, Subcommand};
 
@@ -98,7 +94,6 @@ fn main() {
     match &cli.command {
         Commands::Tags(args) => tags_handling(cli.path.as_str(), args),
         Commands::View => {
-            let files: Vec<String> = list_all_files(cli.path.as_str());
         }
     }
 }
@@ -177,8 +172,8 @@ fn write_tag_files(extension_type: &str, mut arg_clone: PathBuf, export_data: &[
     }
 
     match wrt.flush() {
-        Ok(o) => println!("\x1b[1;32mSuccessfully\x1b[0m saved CSV as \x1b[1m{:?} \x1b[0m", arg_clone),
-        Err(e) => println!("Error when writing in file")
+        Ok(_o) => println!("\x1b[1;32mSuccessfully\x1b[0m saved CSV as \x1b[1m{:?} \x1b[0m", arg_clone),
+        Err(_e) => println!("Error when writing in file")
     }
 
 }
