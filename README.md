@@ -2,10 +2,10 @@
 Minimal, fast, and extensible Rust DICOM toolkit for automating and optimizing DICOM workflows
 
 ## Base of CLI (Goals for v0.1)
-- [ ] tags:
-    - [ ] all  : Dumps all tags
-    - [ ] "tag": for a single tag
-    - [ ] short:  a curated list of “high-value” tags (PatientID, etc...)
+- [x] tags:
+    - [x] all  : Dumps all tags
+    - [x] "tag": for a single tag
+    - [x] short:  a curated list of “high-value” tags (PatientID, etc...)
 - [ ] view: Display the image (ASCII/Invoke OS' Viewer)
 - [ ] anonymize: Remove PHI
 
