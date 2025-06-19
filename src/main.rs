@@ -1,16 +1,22 @@
 use std::fs::File;
-use std::{fs};
+use std::{error, fs};
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
+use std::process::Command;
 
 use serde::Serialize;
 use csv::Writer;
 use clap::{Parser, Args, Subcommand};
+use image::{ImageEncoder, ImageBuffer};
+use image::{GrayImage, Luma, DynamicImage};
+use byteorder::{ByteOrder, LittleEndian};
 
-use dicom::object::open_file;
-use dicom::dictionary_std::StandardDataDictionary;
-use dicom::core::{DataDictionary, Tag};
-use dicom::object::{FileDicomObject, InMemDicomObject};
+//use dicom::object::open_file;
+use dicom_object::open_file;
+use dicom_dictionary_std::StandardDataDictionary;
+use dicom_core::{DataDictionary, Tag};
+use dicom_object::{FileDicomObject, InMemDicomObject};
+use dicom_pixeldata::PixelDecoder;
 
 #[derive(Parser)]
 #[command(name = "app")]
@@ -90,11 +96,9 @@ fn parse_tag_flags(s: &str) -> Result<TagFlags, String> {
 
 fn main() {
     let cli = Cli::parse();
-
     match &cli.command {
         Commands::Tags(args) => tags_handling(cli.path.as_str(), args),
-        Commands::View => {
-        }
+        Commands::View => view_handling(cli.path.as_str()), 
     }
 }
 
@@ -116,6 +120,7 @@ fn list_all_files(user_path: &str) -> Vec<String>{
     }
     res
 }
+
 
 fn tags_handling(path: &str, args: &TagsArgs){
 
@@ -343,3 +348,93 @@ fn is_warning_tag(tag: Tag) -> bool {
         | Tag(0x0018, 0x1030) // Protocol Name
     )
 }
+
+
+
+fn view_handling(path: &str) {
+    let files: Vec<String> = list_all_files(path);
+    for file in files {
+        let obj = match open_file(path) {
+            Ok(o) => o,
+            Err(_) => panic!("Can't open the file"),
+        };
+        view_processing(file.as_str(), &obj);
+    }
+}
+
+struct DataInfo {
+    bits_allocated: u16,
+    bits_stored: u16,
+    high_bits: u16,
+    pixel_data: Vec<u8>,
+    rows: u16,
+    columns: u16,
+}
+
+fn view_processing(path: &str, obj: &FileDicomObject<InMemDicomObject<StandardDataDictionary>>){
+    convert_dicom_to_png(path);
+    //if let Some(data_info) = view_get_data(obj){
+    //    let png_path = PathBuf::from(path);
+    //    png_path.with_extension("png");
+    //
+    //    //handling_image(png_path, &data_info);
+    //} else {
+    //    println!("ca nmarchae [as]");
+    //
+    //}
+
+}
+
+
+fn view_get_data(obj: &FileDicomObject<InMemDicomObject<StandardDataDictionary>>) -> Option<DataInfo> {
+    if let (
+        Ok(bits_allocated),
+        Ok(bits_stored),
+        Ok(high_bits),
+        Ok(pixel_data),
+        Ok(rows),
+        Ok(columns),
+    ) = (
+    obj.element(Tag(0x0028, 0x0100)),
+    obj.element(Tag(0x0028, 0x0101)),
+    obj.element(Tag(0x0028, 0x0102)),
+    obj.element(Tag(0x7FE0, 0x0010)),
+    obj.element(Tag(0x0028, 0x0010)),
+    obj.element(Tag(0x0028, 0x0011)),
+    ) {
+        if let (
+            Ok(bits_allocated),
+            Ok(bits_stored),
+            Ok(high_bits),
+            Ok(pixel_data),
+            Ok(rows),
+            Ok(columns),
+        ) = (
+        bits_allocated.to_int::<u16>(),
+        bits_stored.to_int::<u16>(),
+        high_bits.to_int::<u16>(),
+        pixel_data.to_bytes(),
+        rows.to_int::<u16>(),
+        columns.to_int::<u16>(),
+        ) {
+            let pixel_data_v = pixel_data.to_vec();
+            return Some(DataInfo {
+                bits_allocated,
+                bits_stored,
+                high_bits,
+                pixel_data: pixel_data_v,
+                rows,
+                columns,
+            });
+        } else { None }
+    } else { None }
+}
+fn convert_dicom_to_png(dicom_path: &str) -> Result<(), Box<dyn std::error::Error>>{
+    let obj = open_file(dicom_path).unwrap();
+    let image = obj.decode_pixel_data().unwrap();
+    let dynamic_image = image.to_dynamic_image(0).unwrap();
+    dynamic_image.save("out.png");
+    println!("dgdfg");
+    Ok(())
+}
+
