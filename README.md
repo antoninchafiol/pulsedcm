@@ -22,7 +22,7 @@ Use the `tags` command to display or export metadata.
 rdicom-lite <PATH> tags <MODE> [EXTRA]
 ```
 
-### Available `MODE` options:
+#### Available `MODE` options:
 
 | Mode | Description |
 |---|---|
@@ -30,12 +30,12 @@ rdicom-lite <PATH> tags <MODE> [EXTRA]
 |`short`| Displays a predefined short list of common tags: `PatientName`, `StudyDate`, `Modality`, `SeriesDescription`.|
 |`specific`| Act as the `EXTRA`. Displays only selected tags, comma-separated. Tag names are case-insensitive.|
 
-#### Example using `specific` mode:
+##### Example using `specific` mode:
 ```bash
 rdicom-lite ./scan.dcm tags PatientName,PatientID,StudyDate
 ```
 
-### Available `EXTRA` options
+#### Available `EXTRA` options
 Can add either one or all to export the usual output as serialized JSON or CSV.
 If encounter a file at this path, create a new one
 | Mode | Description |
@@ -50,7 +50,9 @@ The outputed data consists of:
 - vr
 - value
 
+### View Mode
 
+**Warning:** As using the dicom-rs crate, the view mode is restricted and unable to decode JPEG 2000 Lossless compression as of now.
 
 # Goals
 ## Base of CLI (Goals for v0.1)
