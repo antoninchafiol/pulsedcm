@@ -1,3 +1,4 @@
+use std::error::Error;
 use std::fs::File;
 use std::{error, fs};
 use std::path::{Path, PathBuf};
@@ -7,9 +8,6 @@ use std::process::Command;
 use serde::Serialize;
 use csv::Writer;
 use clap::{Parser, Args, Subcommand};
-use image::{ImageEncoder, ImageBuffer};
-use image::{GrayImage, Luma, DynamicImage};
-use byteorder::{ByteOrder, LittleEndian};
 
 //use dicom::object::open_file;
 use dicom_object::open_file;
@@ -35,7 +33,7 @@ enum Commands {
     /// Work with tags
     Tags(TagsArgs),
     /// View a file
-    View,
+    View(ViewArgs),
 }
 
 #[derive(Args, Debug)]
@@ -53,6 +51,23 @@ struct TagsArgs {
     csv: Option<PathBuf>,
     
 }
+
+#[derive(Args, Debug)]
+struct ViewArgs {
+
+    /// Number of 
+    #[arg(long, value_name="NUMBER")]
+    open: Option<u8>,
+    
+    /// Writes PNGs on temp directory instead of in the directory of DICOM files
+    #[arg(long)]
+    temp: Option<bool>,
+    
+    /// Number of threads to launch to process
+    #[arg(long, value_name="NUMBER")]
+    jobs: Option<i8>,
+
+} 
 
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
 enum TagFlags {
@@ -350,15 +365,12 @@ fn is_warning_tag(tag: Tag) -> bool {
 }
 
 
-
 fn view_handling(path: &str) {
     let files: Vec<String> = list_all_files(path);
     for file in files {
-        let obj = match open_file(path) {
-            Ok(o) => o,
-            Err(_) => panic!("Can't open the file"),
-        };
-        view_processing(file.as_str(), &obj);
+        println!("{}",file);
+        let mut f = PathBuf::from(file);
+        view_processing(&mut f);
     }
 }
 
@@ -371,18 +383,11 @@ struct DataInfo {
     columns: u16,
 }
 
-fn view_processing(path: &str, obj: &FileDicomObject<InMemDicomObject<StandardDataDictionary>>){
-    convert_dicom_to_png(path);
-    //if let Some(data_info) = view_get_data(obj){
-    //    let png_path = PathBuf::from(path);
-    //    png_path.with_extension("png");
-    //
-    //    //handling_image(png_path, &data_info);
-    //} else {
-    //    println!("ca nmarchae [as]");
-    //
-    //}
-
+fn view_processing(path: &mut PathBuf) {
+    match convert_dicom_to_png(path){
+        Ok(_o) => {},
+        Err(_e)=> println!("Can't process {}", path.display()),
+    };
 }
 
 
@@ -429,12 +434,14 @@ fn view_get_data(obj: &FileDicomObject<InMemDicomObject<StandardDataDictionary>>
         } else { None }
     } else { None }
 }
-fn convert_dicom_to_png(dicom_path: &str) -> Result<(), Box<dyn std::error::Error>>{
-    let obj = open_file(dicom_path).unwrap();
-    let image = obj.decode_pixel_data().unwrap();
-    let dynamic_image = image.to_dynamic_image(0).unwrap();
-    dynamic_image.save("out.png");
-    println!("dgdfg");
+
+fn convert_dicom_to_png(dicom_path: &mut PathBuf) -> Result<(), Box<dyn std::error::Error>>{
+    let dpath = dicom_path.to_str().ok_or("Can't open the path")?;
+    let obj = open_file(dpath)?;
+    let image = obj.decode_pixel_data()?;
+    let dynamic_image = image.to_dynamic_image(0)?;
+    let _ = dicom_path.set_extension("png");
+    dynamic_image.save(dicom_path)?;
     Ok(())
 }
 
