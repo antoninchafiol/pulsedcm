@@ -9,7 +9,7 @@ use serde::Serialize;
 use csv::Writer;
 use clap::{Parser, Args, Subcommand};
 
-//use dicom::object::open_file;
+use tempfile::TempDir;
 use dicom_object::open_file;
 use dicom_dictionary_std::StandardDataDictionary;
 use dicom_core::{DataDictionary, Tag};
@@ -38,15 +38,18 @@ enum Commands {
 
 #[derive(Args, Debug)]
 struct TagsArgs {
+    /// Type of args to provide between all,short and specific tagname
     #[arg(
         default_value = "all",
         value_parser = parse_tag_flags)
     ]
     kind: TagFlags,
 
+    /// Export all output as a Serialized JSON
     #[arg(long, value_name="FILE")]
     json: Option<PathBuf>,
     
+    /// Export all output as a Serialized CSV
     #[arg(long, value_name="FILE")]
     csv: Option<PathBuf>,
     
@@ -55,13 +58,14 @@ struct TagsArgs {
 #[derive(Args, Debug)]
 struct ViewArgs {
 
-    /// Number of 
+    /// Number of images to actually display via OS' PNG Viewer
     #[arg(long, value_name="NUMBER")]
     open: Option<u8>,
     
-    /// Writes PNGs on temp directory instead of in the directory of DICOM files
+    /// Writes PNGs on temp directory instead of in the directory of DICOM files, invoke an open 1
+    /// option
     #[arg(long)]
-    temp: Option<bool>,
+    temp: bool,
     
     /// Number of threads to launch to process
     #[arg(long, value_name="NUMBER")]
@@ -113,7 +117,7 @@ fn main() {
     let cli = Cli::parse();
     match &cli.command {
         Commands::Tags(args) => tags_handling(cli.path.as_str(), args),
-        Commands::View => view_handling(cli.path.as_str()), 
+        Commands::View(args) => view_handling(cli.path, args), 
     }
 }
 
@@ -365,83 +369,98 @@ fn is_warning_tag(tag: Tag) -> bool {
 }
 
 
-fn view_handling(path: &str) {
-    let files: Vec<String> = list_all_files(path);
-    for file in files {
+fn view_handling(path: String, args: &ViewArgs) {
+    let mut open: u8 = args.open.unwrap_or(0);
+    let jobs: i8 = args.jobs.unwrap_or(1);
+    let temp: bool = args.temp;
+
+    let files: Vec<String> = list_all_files(path.as_str());
+ 
+    let (temp_dir, tmp_path): (Option<TempDir>, Option<PathBuf>) = if temp {
+        match TempDir::new() {
+            Ok(dir) => {
+                let path = dir.path().to_path_buf();
+                (Some(dir), Some(path))
+            }
+            Err(e) => {
+                eprintln!("Failed to create temporary directory: {}", e);
+                return;
+            }
+        }
+    } else {
+        (None, None)
+    };
+
+    for (idx, file) in files.iter().enumerate() {
         println!("{}",file);
+
         let mut f = PathBuf::from(file);
-        view_processing(&mut f);
+        
+        let mut output_path = f.clone();
+        output_path.set_extension("png");
+        
+        if temp {
+            if let Some(tmp_path) = &tmp_path {
+                if let Some(file_name) = f.file_name() {
+                    output_path = tmp_path.join(file_name);
+                    output_path.set_extension("png");
+                } else {
+                    eprintln!("No filename in path: {}", f.display());
+                    continue;
+                }
+            }
+            if open <= 0 {
+                open = 1;
+            }
+        }
+        match view_processing(&mut f, &output_path, idx < open as usize, temp){
+            Ok(_o) => {},
+            Err(_e)=> eprintln!("Can't process {} : {}", f.display(), _e),
+        };
     }
 }
 
-struct DataInfo {
-    bits_allocated: u16,
-    bits_stored: u16,
-    high_bits: u16,
-    pixel_data: Vec<u8>,
-    rows: u16,
-    columns: u16,
-}
-
-fn view_processing(path: &mut PathBuf) {
-    match convert_dicom_to_png(path){
-        Ok(_o) => {},
-        Err(_e)=> println!("Can't process {}", path.display()),
-    };
-}
-
-
-fn view_get_data(obj: &FileDicomObject<InMemDicomObject<StandardDataDictionary>>) -> Option<DataInfo> {
-    if let (
-        Ok(bits_allocated),
-        Ok(bits_stored),
-        Ok(high_bits),
-        Ok(pixel_data),
-        Ok(rows),
-        Ok(columns),
-    ) = (
-    obj.element(Tag(0x0028, 0x0100)),
-    obj.element(Tag(0x0028, 0x0101)),
-    obj.element(Tag(0x0028, 0x0102)),
-    obj.element(Tag(0x7FE0, 0x0010)),
-    obj.element(Tag(0x0028, 0x0010)),
-    obj.element(Tag(0x0028, 0x0011)),
-    ) {
-        if let (
-            Ok(bits_allocated),
-            Ok(bits_stored),
-            Ok(high_bits),
-            Ok(pixel_data),
-            Ok(rows),
-            Ok(columns),
-        ) = (
-        bits_allocated.to_int::<u16>(),
-        bits_stored.to_int::<u16>(),
-        high_bits.to_int::<u16>(),
-        pixel_data.to_bytes(),
-        rows.to_int::<u16>(),
-        columns.to_int::<u16>(),
-        ) {
-            let pixel_data_v = pixel_data.to_vec();
-            return Some(DataInfo {
-                bits_allocated,
-                bits_stored,
-                high_bits,
-                pixel_data: pixel_data_v,
-                rows,
-                columns,
-            });
-        } else { None }
-    } else { None }
-}
-
-fn convert_dicom_to_png(dicom_path: &mut PathBuf) -> Result<(), Box<dyn std::error::Error>>{
-    let dpath = dicom_path.to_str().ok_or("Can't open the path")?;
-    let obj = open_file(dpath)?;
+fn view_processing(input_path: &mut PathBuf, output_path: &PathBuf, is_to_open: bool, is_temp: bool) -> Result<(), Box<dyn std::error::Error>>{
+    let dinput_path = input_path.to_str().ok_or("Can't open the path")?;
+    let obj = open_file(dinput_path)?;
     let image = obj.decode_pixel_data()?;
     let dynamic_image = image.to_dynamic_image(0)?;
-    let _ = dicom_path.set_extension("png");
-    dynamic_image.save(dicom_path)?;
+    dynamic_image.save(&output_path)?;
+    println!("{} - {}", output_path.exists() , output_path.display());
+    println!("to open : {}", is_to_open);
+    if is_to_open {
+        open_image(output_path.to_str().unwrap());       
+    }
+    println!("Opened");
+    //if is_temp {
+    //    File::open(output_path)?.sync_all()?;
+    //}
+
     Ok(())
+    
 }
 
+fn open_image(path: &str){
+    let result = if cfg!(target_os = "windows") {
+        println!(">> launching shell with: cmd /C start \"\" {}",
+            path);
+
+        Command::new("cmd")
+            .args(&["/C", "start", "",path])
+            .spawn()
+    } else if cfg!(target_os = "macos") {
+        Command::new("open")
+            .arg(path)
+            .spawn()
+    } else if cfg!(target_os = "linux") {
+        Command::new("xdg-open")
+            .arg(path)
+            .spawn()
+    } else {
+        Err(std::io::Error::new(std::io::ErrorKind::Other, "Unsupported OS"))
+    };
+
+    if let Err(e) = result {
+        eprintln!("Failed to open image: {}", e);
+    }
+}
