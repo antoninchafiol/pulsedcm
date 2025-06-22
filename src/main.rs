@@ -1,6 +1,6 @@
 use std::error::Error;
+use std::fs;
 use std::fs::File;
-use std::{error, fs};
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 use std::process::Command;
@@ -371,70 +371,68 @@ fn is_warning_tag(tag: Tag) -> bool {
 
 fn view_handling(path: String, args: &ViewArgs) {
     let mut open: u8 = args.open.unwrap_or(0);
-    let jobs: i8 = args.jobs.unwrap_or(1);
-    let temp: bool = args.temp;
+    let _jobs: i8 = args.jobs.unwrap_or(1);
+    let is_temp: bool = args.temp;
 
     let files: Vec<String> = list_all_files(path.as_str());
  
-    let (temp_dir, tmp_path): (Option<TempDir>, Option<PathBuf>) = if temp {
+
+    if is_temp {
         match TempDir::new() {
             Ok(dir) => {
                 let path = dir.path().to_path_buf();
-                (Some(dir), Some(path))
+                if open <= 0 {
+                    open = 1;
+                }
+
+                for (idx, file) in files.iter().enumerate() {
+                    println!("{}",file);
+
+                    let mut input_path = PathBuf::from(file);
+                    let mut output_path = path.join(input_path.file_name().unwrap_or_else(||{
+                        println!("no filename in {}", input_path.display()); 
+                        std::ffi::OsStr::new("unknown.png")
+                    }) 
+                    );
+                    output_path.set_extension("png");
+
+                    view_processing(&mut input_path, &output_path, idx < open as usize).unwrap_or_else(|_e|{
+                        eprintln!("Can't process {} : {}", input_path.display(), _e);
+                    });
+                }
             }
             Err(e) => {
                 eprintln!("Failed to create temporary directory: {}", e);
                 return;
             }
         }
-    } else {
-        (None, None)
-    };
+        println!("\x1b[1m>> \x1b[0mPress Enter to exit and delete temporary files...");
+        let _ = std::io::stdin().read_line(&mut String::new());
+    }
+    else {
+        for (idx, file) in files.iter().enumerate() {
+            println!("{}",file);
 
-    for (idx, file) in files.iter().enumerate() {
-        println!("{}",file);
+            let mut input_path = PathBuf::from(file);
+            let mut output_path = input_path.clone();
+            output_path.set_extension("png");
 
-        let mut f = PathBuf::from(file);
-        
-        let mut output_path = f.clone();
-        output_path.set_extension("png");
-        
-        if temp {
-            if let Some(tmp_path) = &tmp_path {
-                if let Some(file_name) = f.file_name() {
-                    output_path = tmp_path.join(file_name);
-                    output_path.set_extension("png");
-                } else {
-                    eprintln!("No filename in path: {}", f.display());
-                    continue;
-                }
-            }
-            if open <= 0 {
-                open = 1;
-            }
+            view_processing(&mut input_path, &output_path, idx < open as usize).unwrap_or_else(|_e|{
+                eprintln!("Can't process {} : {}", input_path.display(), _e);
+            });
         }
-        match view_processing(&mut f, &output_path, idx < open as usize, temp){
-            Ok(_o) => {},
-            Err(_e)=> eprintln!("Can't process {} : {}", f.display(), _e),
-        };
     }
 }
 
-fn view_processing(input_path: &mut PathBuf, output_path: &PathBuf, is_to_open: bool, is_temp: bool) -> Result<(), Box<dyn std::error::Error>>{
+fn view_processing(input_path: &mut PathBuf, output_path: &PathBuf, is_to_open: bool) -> Result<(), Box<dyn Error>>{
     let dinput_path = input_path.to_str().ok_or("Can't open the path")?;
     let obj = open_file(dinput_path)?;
     let image = obj.decode_pixel_data()?;
     let dynamic_image = image.to_dynamic_image(0)?;
     dynamic_image.save(&output_path)?;
-    println!("{} - {}", output_path.exists() , output_path.display());
-    println!("to open : {}", is_to_open);
     if is_to_open {
         open_image(output_path.to_str().unwrap());       
     }
-    println!("Opened");
-    //if is_temp {
-    //    File::open(output_path)?.sync_all()?;
-    //}
 
     Ok(())
     
@@ -442,9 +440,6 @@ fn view_processing(input_path: &mut PathBuf, output_path: &PathBuf, is_to_open: 
 
 fn open_image(path: &str){
     let result = if cfg!(target_os = "windows") {
-        println!(">> launching shell with: cmd /C start \"\" {}",
-            path);
-
         Command::new("cmd")
             .args(&["/C", "start", "",path])
             .spawn()
