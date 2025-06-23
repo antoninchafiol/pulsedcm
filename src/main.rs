@@ -34,6 +34,7 @@ enum Commands {
     Tags(TagsArgs),
     /// View a file
     View(ViewArgs),
+    Ano(AnoArgs),
 }
 
 #[derive(Args, Debug)]
@@ -72,6 +73,69 @@ struct ViewArgs {
     jobs: Option<i8>,
 
 } 
+
+/// DICOM Supplement 142 Standard de-identification
+/// Warning: No pixel modification for this version
+#[derive(Args, Debug)]
+struct AnoArgs {
+    /// strategy of de-idenficication:
+    /// Type 1: Replace with dummy value
+    /// Type 2: Zero length
+    /// Type 3: Remove completely 
+    #[arg(
+        long, 
+        value_name="NUMBER",
+        value_parser=parse_actions
+    )]
+    action: Option<Actions>,
+    
+    /// De-identification profiles
+    /// basic: Remove required PHI (safe)
+    /// moderate: Also remove institution/device info
+    /// strict: Maximum removal, leaves only technical data
+    #[arg(
+        long, 
+        value_name="NUMBER",
+        value_parser=parse_policy
+    )]
+    policy: Option<Policy>,
+
+    /// Number of threads to launch to process (0 = All possible threads)
+    #[arg(long, value_name="NUMBER")]
+    jobs: Option<u8>,
+
+    /// Output directory to save anonymized files.
+    /// If omitted, input files will be overwritten in-place.
+    /// Must be a directory if specified.
+    #[arg(long)]
+    out: Option<PathBuf>,
+
+    /// Show the changed args for the file
+    /// If multiple files it'll stop processing after the 1st to give an output
+    #[arg(short, long)]
+    dry: Option<bool>,
+
+    /// Show all changed values
+    #[arg(short, long)]
+    verbose: Option<bool>,
+
+} 
+
+/// Enum linked to the Actions part of the anonymization command
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
+enum Actions {
+    Replace,
+    Zero,
+    Remove,
+}
+
+/// Enum linked to the policy part of the anonymization command
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
+enum Policy {
+    Basic, 
+    Moderate,
+    Strict,
+}
 
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
 enum TagFlags {
@@ -113,11 +177,36 @@ fn parse_tag_flags(s: &str) -> Result<TagFlags, String> {
     }
 }
 
+fn parse_actions(input: &str) -> Result<Actions, String>{
+    match input.to_lowercase().as_str() {
+        "replace" => Ok(Actions::Replace),
+        "remove"  => Ok(Actions::Remove),
+        "zero"    => Ok(Actions::Zero),
+        other => {
+            println!("Parsed action is not known");
+            Err("No".to_string())
+        }
+    }
+}
+fn parse_policy(input: &str) -> Result<Policy, String>{
+    match input.to_lowercase().as_str() {
+        "basic"    => Ok(Policy::Basic) ,
+        "moderate" => Ok(Policy::Moderate) ,
+        "strict"   => Ok(Policy::Strict) ,
+        other => {
+            println!("Parsed policy is not known");
+            Err("No".to_string())
+        }
+    }
+}
+
+
 fn main() {
     let cli = Cli::parse();
     match &cli.command {
         Commands::Tags(args) => tags_handling(cli.path.as_str(), args),
         Commands::View(args) => view_handling(cli.path, args), 
+        Commands::Ano(args) => println!("Ano value"), 
     }
 }
 
