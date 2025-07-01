@@ -1,6 +1,7 @@
 use std::error::Error;
 use std::fs;
 use std::fs::File;
+use std::io::empty;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 use std::process::Command;
@@ -12,9 +13,10 @@ use clap::{Parser, Args, Subcommand};
 use tempfile::TempDir;
 use dicom_object::open_file;
 use dicom_dictionary_std::StandardDataDictionary;
-use dicom_core::{DataDictionary, Tag};
+use dicom_core::{DataDictionary, DataElement, DicomValue, PrimitiveValue, Tag};
 use dicom_object::{FileDicomObject, InMemDicomObject};
 use dicom_pixeldata::PixelDecoder;
+use dicom_object::AtAccessError;
 
 #[derive(Parser)]
 #[command(name = "app")]
@@ -137,6 +139,91 @@ enum Policy {
     Strict,
 }
 
+impl Policy {
+    // https://dicom.nema.org/dicom/2013/output/chtml/part15/chapter_E.html
+    //
+    fn tags(&self) -> Vec<Tag>{
+        match self { 
+            Policy::Basic => vec![
+                Tag(0x0010,0x0010),
+                Tag(0x0010,0x0020),
+                Tag(0x0010,0x0030),
+                Tag(0x0010,0x0040),
+                Tag(0x0010,0x1000),
+                Tag(0x0010,0x1001),
+                Tag(0x0010,0x1040),
+                Tag(0x0010,0x2160),
+                Tag(0x0010,0x4000),
+                Tag(0x0008,0x0090),
+                Tag(0x0008,0x0050),
+                Tag(0x0008,0x0080),
+                Tag(0x0008,0x0081),
+                Tag(0x0008,0x1040),
+                Tag(0x0008,0x1010),
+                Tag(0x0038,0x0010), 
+                Tag(0x0032,0x1032), 
+                Tag(0x0032,0x1060), 
+                Tag(0x0032,0x1064), 
+                Tag(0x0040,0x1001), 
+                Tag(0x0040,0x1003), 
+                Tag(0x0040,0x1400), 
+                Tag(0x0008,0x009C), 
+                Tag(0x0010,0x1060), 
+                Tag(0x0040,0x0243),
+                Tag(0x0040,0x0242),
+                Tag(0x0040,0x0254),
+                Tag(0x0018,0x1000),
+                Tag(0x0020,0x4000),
+                Tag(0x4008,0x0114)
+            ],
+            Policy::Moderate => {
+                let mut base = Policy::Basic.tags();
+                base.extend([
+                    Tag(0x0008,0x0020),
+                    Tag(0x0008,0x0021),
+                    Tag(0x0008,0x0022),
+                    Tag(0x0008,0x0023),
+                    Tag(0x0008,0x0030),
+                    Tag(0x0008,0x0031),
+                    Tag(0x0008,0x0032),
+                    Tag(0x0008,0x0033),
+                    Tag(0x0018,0x0015), 
+                    Tag(0x0018,0x5100), 
+                    Tag(0x0008,0x1070),
+                    Tag(0x0018,0x1010),
+                    Tag(0x0018,0x1050),
+                    Tag(0x0018,0x1051)
+                ]);
+                base
+            }
+            Policy::Strict => {
+                let mut base = Policy::Moderate.tags();
+                base.extend([
+                    Tag(0x0020,0x000D),
+                    Tag(0x0020,0x000E),
+                    Tag(0x0008,0x0018),
+                    Tag(0x0018,0x1000),
+                    Tag(0x0018,0x1002),
+                    Tag(0x0008,0x0070),
+                    Tag(0x0008,0x1011), 
+                    Tag(0x0008,0x1070), 
+                    Tag(0x0018,0x1004), 
+                    Tag(0x0018,0x1020), 
+                    Tag(0x0018,0x1030), 
+                    Tag(0x0040,0xA730), 
+                    Tag(0x0008,0x1090),
+                    Tag(0x0008,0x0060),        
+                    Tag(0x0010,0x1020),
+                    Tag(0x0010,0x1030),
+                    Tag(0x0010,0x21B0),
+                    Tag(0x0040,0xA124),
+                ]);
+                base
+            },
+        }
+    }
+}
+
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
 enum TagFlags {
     /// All tags
@@ -183,8 +270,7 @@ fn parse_actions(input: &str) -> Result<Actions, String>{
         "remove"  => Ok(Actions::Remove),
         "zero"    => Ok(Actions::Zero),
         other => {
-            println!("Parsed action is not known");
-            Err("No".to_string())
+            Err("should be either: 'replace', 'remove' or 'zero'".to_string())
         }
     }
 }
@@ -194,8 +280,7 @@ fn parse_policy(input: &str) -> Result<Policy, String>{
         "moderate" => Ok(Policy::Moderate) ,
         "strict"   => Ok(Policy::Strict) ,
         other => {
-            println!("Parsed policy is not known");
-            Err("No".to_string())
+            Err("should be either: 'basic', 'moderate' or 'strict'".to_string())
         }
     }
 }
@@ -206,7 +291,7 @@ fn main() {
     match &cli.command {
         Commands::Tags(args) => tags_handling(cli.path.as_str(), args),
         Commands::View(args) => view_handling(cli.path, args), 
-        Commands::Ano(args) => println!("Ano value"), 
+        Commands::Ano(args) => ano_handling(cli.path, args), 
     }
 }
 
@@ -320,6 +405,7 @@ fn all_tagging(path: &str, obj: &FileDicomObject<InMemDicomObject<StandardDataDi
     return output;
 
 }
+
 fn short_tagging(path: &str, obj: &FileDicomObject<InMemDicomObject<StandardDataDictionary>>, to_display: bool) -> Vec<SerializableDicomEntry>{
     let mut output: Vec<SerializableDicomEntry> = Vec::new();
     let short_tags = [
@@ -548,3 +634,59 @@ fn open_image(path: &str){
         eprintln!("Failed to open image: {}", e);
     }
 }
+
+fn ano_handling(path: String, args: &AnoArgs){
+    let action :Actions = args.action.clone().unwrap_or(Actions::Zero);
+    let dry    :bool    = args.dry.unwrap_or(false);
+    let jobs   :u8      = args.jobs.unwrap_or(1);
+    let out    :PathBuf = args.out.clone().unwrap_or_else(|| {println!("out argument has issue when parsing"); PathBuf::from("")});
+    let policy :Policy  = args.policy.clone().unwrap_or(Policy::Basic);
+    let verbose:bool    = args.verbose.unwrap_or(false);
+    
+    let files: Vec<String> = list_all_files(path.as_str());
+
+    for (idx, file) in files.iter().enumerate() {
+        if dry && idx == 1 {
+            if verbose {
+                println!("Launching a dry run");
+            }    
+            // Process the file
+            // print the tags
+            return; 
+        }
+        // Process file
+
+    }
+}
+
+fn ano_file_process(path: PathBuf, action: Actions, policy:Policy, out: PathBuf, verbose: bool) -> FileDicomObject<InMemDicomObject> {
+    let mut data = open_file(path).unwrap(); 
+    let filter = policy.tags();
+    for tag in filter {
+        match action {
+            Actions::Zero => {
+                let res = data.update_value_at(tag, |value| {
+                    *value.primitive_mut().unwrap() = PrimitiveValue::from("0");
+                });
+                if let Err(err) = res {
+                    eprintln!("Warning: couldn’t replace tag {:?}: {}", tag, err);
+                }
+            },
+            Actions::Remove => {
+                if !data.remove_element(tag) {
+                    eprintln!("Warning: couldn’t remove tag {:?}", tag);
+                }
+            }
+            Actions::Replace => {
+                let res = data.update_value_at(tag, |value| {
+                    *value.primitive_mut().unwrap() = PrimitiveValue::from("Anonymized");
+                });
+                if let Err(err) = res {
+                    eprintln!("Warning: couldn’t replace tag {:?}: {}", tag, err);
+                }
+            }
+        };
+    }
+    data
+}
+
