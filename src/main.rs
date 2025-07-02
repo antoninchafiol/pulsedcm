@@ -81,12 +81,12 @@ struct ViewArgs {
 #[derive(Args, Debug)]
 struct AnoArgs {
     /// strategy of de-idenficication:
-    /// Type 1: Replace with dummy value
-    /// Type 2: Zero length
-    /// Type 3: Remove completely 
+    /// replace: Replace with dummy value
+    /// zero: Zero length
+    /// remove: Remove completely 
     #[arg(
         long, 
-        value_name="NUMBER",
+        value_name="ACTION",
         value_parser=parse_actions
     )]
     action: Option<Actions>,
@@ -97,7 +97,7 @@ struct AnoArgs {
     /// strict: Maximum removal, leaves only technical data
     #[arg(
         long, 
-        value_name="NUMBER",
+        value_name="POLICY",
         value_parser=parse_policy
     )]
     policy: Option<Policy>,
@@ -114,12 +114,12 @@ struct AnoArgs {
 
     /// Show the changed args for the file
     /// If multiple files it'll stop processing after the 1st to give an output
-    #[arg(short, long)]
-    dry: Option<bool>,
+    #[arg(short, long, default_value= "false")]
+    dry: bool,
 
     /// Show all changed values
     #[arg(short, long)]
-    verbose: Option<bool>,
+    verbose: bool,
 
 } 
 
@@ -637,21 +637,37 @@ fn open_image(path: &str){
 
 fn ano_handling(path: String, args: &AnoArgs){
     let action :Actions = args.action.clone().unwrap_or(Actions::Zero);
-    let dry    :bool    = args.dry.unwrap_or(false);
+    let dry    :bool    = args.dry;
     let jobs   :u8      = args.jobs.unwrap_or(1);
-    let out    :PathBuf = args.out.clone().unwrap_or_else(|| {println!("out argument has issue when parsing"); PathBuf::from("")});
+    let out    :PathBuf = args.out.clone().unwrap_or_else(|| {
+        println!("out argument has issue when parsing"); 
+        PathBuf::from(&path)
+    });
     let policy :Policy  = args.policy.clone().unwrap_or(Policy::Basic);
-    let verbose:bool    = args.verbose.unwrap_or(false);
+    let verbose:bool    = args.verbose;
     
     let files: Vec<String> = list_all_files(path.as_str());
 
     for (idx, file) in files.iter().enumerate() {
-        if dry && idx == 1 {
+        if dry && idx == 0 {
             if verbose {
                 println!("Launching a dry run");
             }    
-            // Process the file
-            // print the tags
+            let data = ano_file_process(PathBuf::from(file), action, &policy, verbose);
+            
+            for element in data.into_iter() {
+                let tag: Tag = element.header().tag;
+                let vr = element.header().vr();
+                let name = StandardDataDictionary
+                    .by_tag(tag)
+                    .map(|entry| entry.alias)
+                    .unwrap_or_else(|| "Unknown");
+                let value: String = element.value()
+                    .to_str()
+                    .map(|cow| cow.into_owned())
+                    .unwrap_or_else(|_| "[Binary]".to_string());
+                print_colorize(tag, vr.to_string(), value.as_str(), name);
+            }
             return; 
         }
         // Process file
@@ -659,33 +675,36 @@ fn ano_handling(path: String, args: &AnoArgs){
     }
 }
 
-fn ano_file_process(path: PathBuf, action: Actions, policy:Policy, out: PathBuf, verbose: bool) -> FileDicomObject<InMemDicomObject> {
+fn ano_file_process(path: PathBuf, action: Actions, policy:&Policy,verbose: bool) -> FileDicomObject<InMemDicomObject> {
     let mut data = open_file(path).unwrap(); 
+    let original_len = data.iter().count();
     let filter = policy.tags();
     for tag in filter {
-        match action {
-            Actions::Zero => {
-                let res = data.update_value_at(tag, |value| {
-                    *value.primitive_mut().unwrap() = PrimitiveValue::from("0");
-                });
-                if let Err(err) = res {
-                    eprintln!("Warning: couldn’t replace tag {:?}: {}", tag, err);
+        if let Err(_) = data.element(tag) {
+            eprintln!("Warning: Tag {} can't be found and will be ignored", tag);
+        }
+        else {
+            match action {
+                Actions::Zero => {
+                    data.update_value_at(tag, |value| {
+                        *value.primitive_mut().unwrap() = PrimitiveValue::from("0");
+                    }).unwrap_or_else(|err| eprintln!("Warning: couldn’t replace tag {:?}: {}", tag, err));
+                },
+                Actions::Remove => {
+                    if !data.remove_element(tag) {
+                        eprintln!("Warning: couldn’t remove tag {:?}", tag);
+                    }
                 }
-            },
-            Actions::Remove => {
-                if !data.remove_element(tag) {
-                    eprintln!("Warning: couldn’t remove tag {:?}", tag);
+                Actions::Replace => {
+                    data.update_value_at(tag, |value| {
+                        *value.primitive_mut().unwrap() = PrimitiveValue::from("Anonymized");
+                    }).unwrap_or_else(|err| eprintln!("Warning: couldn’t replace tag {:?}: {}", tag, err));
                 }
-            }
-            Actions::Replace => {
-                let res = data.update_value_at(tag, |value| {
-                    *value.primitive_mut().unwrap() = PrimitiveValue::from("Anonymized");
-                });
-                if let Err(err) = res {
-                    eprintln!("Warning: couldn’t replace tag {:?}: {}", tag, err);
-                }
-            }
-        };
+            };
+        }
+    }
+    if verbose {
+        println!("Original Length: {} -> New Length : {}", original_len, data.iter().count());
     }
     data
 }
