@@ -1,6 +1,7 @@
 use std::error::Error;
 use std::fs;
 use std::fs::File;
+use std::io::{self, Write};
 use std::io::empty;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -670,6 +671,21 @@ fn ano_handling(path: String, args: &AnoArgs){
             }
             return; 
         }
+        // Case where out is not specified
+        if file.as_str() == out.as_os_str().to_str() {
+            if ask_yes_no("? No out specified confirm to overwrite actual files") {
+                let data = ano_file_process(PathBuf::from(file), action, &policy, verbose);
+            }
+            else {
+                println!("Stopping...");
+                return;
+            }
+        }
+        else {
+            if !out.is_dir() {
+
+            }
+        }
         // Process file
 
     }
@@ -708,4 +724,12 @@ fn ano_file_process(path: PathBuf, action: Actions, policy:&Policy,verbose: bool
     }
     data
 }
+fn ask_yes_no(question: &str) -> bool {
+    print!("{} Y/N: ", question);
+    let _ = io::stdout().flush();
 
+    let mut input = String::new();
+    io::stdin().read_line(&mut input).unwrap();
+
+    matches!(input.trim().to_lowercase().as_str(), "y" | "yes")
+}
