@@ -640,7 +640,7 @@ fn ano_handling(path: String, args: &AnoArgs){
     let action :Actions = args.action.clone().unwrap_or(Actions::Zero);
     let dry    :bool    = args.dry;
     let jobs   :u8      = args.jobs.unwrap_or(1);
-    let out    :PathBuf = args.out.clone().unwrap_or_else(|| {
+    let mut out    :PathBuf = args.out.clone().unwrap_or_else(|| {
         println!("out argument has issue when parsing"); 
         PathBuf::from(&path)
     });
@@ -654,7 +654,7 @@ fn ano_handling(path: String, args: &AnoArgs){
             if verbose {
                 println!("Launching a dry run");
             }    
-            let data = ano_file_process(PathBuf::from(file), action, &policy, verbose);
+            let data = ano_file_process(PathBuf::from(file), &action, &policy, verbose);
             
             for element in data.into_iter() {
                 let tag: Tag = element.header().tag;
@@ -672,9 +672,20 @@ fn ano_handling(path: String, args: &AnoArgs){
             return; 
         }
         // Case where out is not specified
-        if file.as_str() == out.as_os_str().to_str() {
+        println!("{}", &out.display());
+        if file.as_str() == out.as_os_str().to_str().unwrap() {
             if ask_yes_no("? No out specified confirm to overwrite actual files") {
-                let data = ano_file_process(PathBuf::from(file), action, &policy, verbose);
+                let filename = Path::new(file).file_name().unwrap();
+                out.push(filename);
+                let data = ano_file_process(PathBuf::from(file), &action, &policy, verbose);
+                match data.write_to_file(&out) {
+                    Ok(_o) => {
+                        println!("Wrote succesfully to: {}", &out.display());
+                    },
+                    Err(e) => {
+                        eprintln!("Error while writing to file: {}", e);
+                    },
+                };
             }
             else {
                 println!("Stopping...");
@@ -683,15 +694,26 @@ fn ano_handling(path: String, args: &AnoArgs){
         }
         else {
             if !out.is_dir() {
-
+                eprintln!("Output path shouldn't be a file");
+                return;
             }
+            let filename = Path::new(file).file_name().unwrap();
+            out.push(filename);
+            let data = ano_file_process(PathBuf::from(file), &action, &policy, verbose);
+            match data.write_to_file(&out) {
+                Ok(_o) => {
+                    println!("Wrote succesfully to: {}", &out.display());
+                },
+                Err(e) => {
+                    eprintln!("Error while writing to file: {}", e);
+                },
+            };
         }
-        // Process file
 
     }
 }
 
-fn ano_file_process(path: PathBuf, action: Actions, policy:&Policy,verbose: bool) -> FileDicomObject<InMemDicomObject> {
+fn ano_file_process(path: PathBuf, action: &Actions, policy:&Policy,verbose: bool) -> FileDicomObject<InMemDicomObject> {
     let mut data = open_file(path).unwrap(); 
     let original_len = data.iter().count();
     let filter = policy.tags();
