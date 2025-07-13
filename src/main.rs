@@ -4,8 +4,11 @@ use std::fs::File;
 use std::io::{self, Write};
 use std::io::empty;
 use std::path::{Path, PathBuf};
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{SystemTime, UNIX_EPOCH, Duration};
 use std::process::Command;
+
+use rayon;
+use rayon::prelude::*;
 
 use serde::Serialize;
 use csv::Writer;
@@ -639,7 +642,6 @@ fn open_image(path: &str){
 fn ano_handling(path: String, args: &AnoArgs){
     let action :Actions = args.action.clone().unwrap_or(Actions::Zero);
     let dry    :bool    = args.dry;
-    let jobs   :u8      = args.jobs.unwrap_or(1);
     let mut out    :PathBuf = args.out.clone().unwrap_or_else(|| {
         println!("out argument has issue when parsing"); 
         PathBuf::from(&path)
@@ -648,57 +650,63 @@ fn ano_handling(path: String, args: &AnoArgs){
     let verbose:bool    = args.verbose;
     
     let files: Vec<String> = list_all_files(path.as_str());
+    let jobs   :u8      = jobs_handling(args.jobs, files.len()); 
 
-    for (idx, file) in files.iter().enumerate() {
-        if dry && idx == 0 {
-            if verbose {
-                println!("Launching a dry run");
-            }    
-            let data = ano_file_process(PathBuf::from(file), &action, &policy, verbose);
-            
-            for element in data.into_iter() {
-                let tag: Tag = element.header().tag;
-                let vr = element.header().vr();
-                let name = StandardDataDictionary
-                    .by_tag(tag)
-                    .map(|entry| entry.alias)
-                    .unwrap_or_else(|| "Unknown");
-                let value: String = element.value()
-                    .to_str()
-                    .map(|cow| cow.into_owned())
-                    .unwrap_or_else(|_| "[Binary]".to_string());
-                print_colorize(tag, vr.to_string(), value.as_str(), name);
-            }
-            return; 
-        }
-        // Case where out is not specified
-        println!("{}", &out.display());
-        if file.as_str() == out.as_os_str().to_str().unwrap() {
-            if ask_yes_no("? No out specified confirm to overwrite actual files") {
-                let filename = Path::new(file).file_name().unwrap();
-                out.push(filename);
-                let data = ano_file_process(PathBuf::from(file), &action, &policy, verbose);
-                match data.write_to_file(&out) {
-                    Ok(_o) => {
-                        println!("Wrote succesfully to: {}", &out.display());
-                    },
-                    Err(e) => {
-                        eprintln!("Error while writing to file: {}", e);
-                    },
-                };
-            }
-            else {
-                println!("Stopping...");
-                return;
-            }
+    let thread_pool = rayon::ThreadPoolBuilder::new().num_threads(jobs as usize).build().unwrap();
+    thread_pool.install(|| {
+        files.par_iter().enumerate().for_each(|(idx, file)| {
+            let mut out_clone = out.clone();
+            ano_threaded_function(idx, file, &mut out_clone, dry, &action, &policy, verbose);
+        });
+    });
+}
+
+fn jobs_handling(jobs: Option<u8>, max_file: usize) -> u8 {
+    let j = jobs.unwrap_or_else(|| {
+        return 1;
+    });
+    if j <= 0 {
+        // MAX NUMBER OF THREADS POSSIBLE BY MACHINEa
+        if max_file > rayon::max_num_threads() {
+            return rayon::max_num_threads() as u8;
         }
         else {
-            if !out.is_dir() {
-                eprintln!("Output path shouldn't be a file");
-                return;
-            }
+            return max_file as u8;  
+        }
+    }
+    else {
+        return j;
+    }
+}
+
+
+fn ano_threaded_function(idx: usize, file: &String, out: &mut PathBuf, dry:bool ,action: &Actions, policy:&Policy,verbose: bool) {
+    if dry && idx == 0 {
+        if verbose {
+            println!("Launching a dry run");
+        }    
+        let data = ano_file_process(PathBuf::from(file), &action, &policy, verbose);
+
+        for element in data.into_iter() {
+            let tag: Tag = element.header().tag;
+            let vr = element.header().vr();
+            let name = StandardDataDictionary
+                .by_tag(tag)
+                .map(|entry| entry.alias)
+                .unwrap_or_else(|| "Unknown");
+            let value: String = element.value()
+                .to_str()
+                .map(|cow| cow.into_owned())
+                .unwrap_or_else(|_| "[Binary]".to_string());
+            print_colorize(tag, vr.to_string(), value.as_str(), name);
+        }
+        return; 
+    }
+    // Case where out is not specified
+    if file.as_str() == out.as_os_str().to_str().unwrap() {
+        if ask_yes_no("? No out specified confirm to overwrite actual files") {
             let filename = Path::new(file).file_name().unwrap();
-            out.push(filename);
+            out.to_owned().push(filename);
             let data = ano_file_process(PathBuf::from(file), &action, &policy, verbose);
             match data.write_to_file(&out) {
                 Ok(_o) => {
@@ -709,9 +717,30 @@ fn ano_handling(path: String, args: &AnoArgs){
                 },
             };
         }
-
+        else {
+            println!("Stopping...");
+            return;
+        }
+    }
+    else {
+        if !out.is_dir() {
+            eprintln!("Output path shouldn't be a file");
+            return;
+        }
+        let filename = Path::new(file).file_name().unwrap();
+        out.push(filename);
+        let data = ano_file_process(PathBuf::from(file), &action, &policy, verbose);
+        match data.write_to_file(&out) {
+            Ok(_o) => {
+                println!("Wrote succesfully to: {}", &out.display());
+            },
+            Err(e) => {
+                eprintln!("Error while writing to file: {}", e);
+            },
+        };
     }
 }
+
 
 fn ano_file_process(path: PathBuf, action: &Actions, policy:&Policy,verbose: bool) -> FileDicomObject<InMemDicomObject> {
     let mut data = open_file(path).unwrap(); 

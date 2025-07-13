@@ -1408,6 +1408,7 @@ dependencies = [
  "env_logger",
  "image",
  "log",
+ "rayon",
  "serde",
  "serde_json",
  "tempfile",
