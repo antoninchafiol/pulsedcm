@@ -76,7 +76,7 @@ struct ViewArgs {
     
     /// Number of threads to launch to process
     #[arg(long, value_name="NUMBER")]
-    jobs: Option<i8>,
+    jobs: Option<u8>,
 
 } 
 
@@ -550,11 +550,18 @@ fn is_warning_tag(tag: Tag) -> bool {
 
 fn view_handling(path: String, args: &ViewArgs) {
     let mut open: u8 = args.open.unwrap_or(0);
-    let _jobs: i8 = args.jobs.unwrap_or(1);
     let is_temp: bool = args.temp;
 
     let files: Vec<String> = list_all_files(path.as_str());
+    let jobs: u8 = jobs_handling(args.jobs, files.len());
  
+    let thread_pool = rayon::ThreadPoolBuilder::new().num_threads(jobs as usize).build().unwrap();
+    //thread_pool.install(|| {
+    //    files.par_iter().enumerate().for_each(|(idx, file)| {
+    //        let mut out_clone = out.clone();
+    //        ano_threaded_function(idx, file, &mut out_clone, dry, &action, &policy, verbose);
+    //    });
+    //});
 
     if is_temp {
         match TempDir::new() {
@@ -563,22 +570,24 @@ fn view_handling(path: String, args: &ViewArgs) {
                 if open <= 0 {
                     open = 1;
                 }
+    
+                thread_pool.install(|| {
+                    files.par_iter().enumerate().for_each(|(idx, file)| {
+                        println!("{}",file);
 
-                for (idx, file) in files.iter().enumerate() {
-                    println!("{}",file);
+                        let mut input_path = PathBuf::from(file);
+                        let mut output_path = path.join(input_path.file_name().unwrap_or_else(||{
+                            println!("no filename in {}", input_path.display()); 
+                            std::ffi::OsStr::new("unknown.png")
+                        }) 
+                        );
+                        output_path.set_extension("png");
 
-                    let mut input_path = PathBuf::from(file);
-                    let mut output_path = path.join(input_path.file_name().unwrap_or_else(||{
-                        println!("no filename in {}", input_path.display()); 
-                        std::ffi::OsStr::new("unknown.png")
-                    }) 
-                    );
-                    output_path.set_extension("png");
-
-                    view_processing(&mut input_path, &output_path, idx < open as usize).unwrap_or_else(|_e|{
-                        eprintln!("Can't process {} : {}", input_path.display(), _e);
+                        view_processing(&mut input_path, &output_path, idx < open as usize).unwrap_or_else(|_e|{
+                            eprintln!("Can't process {} : {}", input_path.display(), _e);
+                        });
                     });
-                }
+                });
             }
             Err(e) => {
                 eprintln!("Failed to create temporary directory: {}", e);
@@ -589,19 +598,22 @@ fn view_handling(path: String, args: &ViewArgs) {
         let _ = std::io::stdin().read_line(&mut String::new());
     }
     else {
-        for (idx, file) in files.iter().enumerate() {
-            println!("{}",file);
+        thread_pool.install(|| {
+            files.par_iter().enumerate().for_each(|(idx, file)| {
+                println!("{}",file);
 
-            let mut input_path = PathBuf::from(file);
-            let mut output_path = input_path.clone();
-            output_path.set_extension("png");
+                let mut input_path = PathBuf::from(file);
+                let mut output_path = input_path.clone();
+                output_path.set_extension("png");
 
-            view_processing(&mut input_path, &output_path, idx < open as usize).unwrap_or_else(|_e|{
-                eprintln!("Can't process {} : {}", input_path.display(), _e);
+                view_processing(&mut input_path, &output_path, idx < open as usize).unwrap_or_else(|_e|{
+                    eprintln!("Can't process {} : {}", input_path.display(), _e);
+                });
             });
-        }
+        });
     }
 }
+
 
 fn view_processing(input_path: &mut PathBuf, output_path: &PathBuf, is_to_open: bool) -> Result<(), Box<dyn Error>>{
     let dinput_path = input_path.to_str().ok_or("Can't open the path")?;
