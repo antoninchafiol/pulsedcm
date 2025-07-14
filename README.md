@@ -50,9 +50,62 @@ The outputed data consists of:
 - vr
 - value
 
-### View Mode
+###  View Mode
 
 **Warning:** As using the dicom-rs crate, the view mode is restricted and unable to decode JPEG 2000 Lossless compression as of now.
+
+Use the `view` command to render DICOM slices as PNGs and open them with your OS’s default image viewer.
+
+```bash
+rdicom-lite <PATH> view [OPTIONS]
+
+```
+#### Options
+
+| Option            | Description                                                                                            |
+| ----------------- | ------------------------------------------------------------------------------------------------------ |
+| `--open <NUMBER>` | Number of images to open via the OS’s PNG viewer (e.g. `--open 5` opens the first five PNGs).          |
+| `--temp`          | Write PNGs to the system temporary directory instead of alongside the DICOM files. Implies `--open 1`. |
+| `--jobs <NUMBER>` | Number of threads to launch for parallel processing of slices.                                         |
+| `-h`, `--help`    | Print this help message.                                                                               |
+
+
+### Anonymize Mode
+
+DICOM Supplement 142 Standard de-identification  
+**Warning:** No pixel modification for this version
+
+```bash
+rdicom-lite <PATH> ano [OPTIONS]
+```
+
+#### Options
+
+| Option              | Description                                                                                                                    |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `--action <ACTION>` | See **Action Types** table below.                                                                                              |
+| `--policy <POLICY>` | See **Policy Types** table below.                                                                                              |
+| `--jobs <NUMBER>`   | Number of threads to launch to process (0 or less = all available threads)                                                             |
+| `--out <OUT>`       | Output directory to save anonymized files. If omitted, input files are overwritten in-place. Must be a directory if specified. |
+| `-d`, `--dry`       | Show the changed args for the file. If multiple files, stops after the first to display output.                                |
+| `-v`, `--verbose`   | Show all changed values.                                                                                                       |
+| `-h`, `--help`      | Print this help message.                                                                                                       |
+
+#### Action Types
+
+| Action    | Description                                        |
+| --------- | -------------------------------------------------- |
+| `replace` | Replace the tag’s value with a dummy value.        |
+| `zero`    | Replace the tag’s value with a zero-length string. |
+| `remove`  | Remove the tag entirely.                           |
+
+#### Policy Types
+
+| Policy     | Description                                            |
+| ---------- | ------------------------------------------------------ |
+| `basic`    | Remove only the required PHI elements (safe profile).  |
+| `moderate` | Also remove institution and device information.        |
+| `strict`   | Maximum removal: leaves only technical/essential data. |
 
 # Goals
 ## Base of CLI (Goals for v0.1)
@@ -60,8 +113,8 @@ The outputed data consists of:
     - [x] all  : Dumps all tags
     - [x] "tag": for a single tag
     - [x] short:  a curated list of “high-value” tags (PatientID, etc...)
-- [ ] view: Display the image (ASCII/Invoke OS' Viewer)
-- [ ] anonymize: Remove PHI
+- [x] view: Display the image (ASCII/Invoke OS' Viewer)
+- [x] anonymize: Remove PHI
 
 
 ## Intermediate (Goals for v0.2)
