@@ -1,12 +1,25 @@
-# rdicom-lite
-Minimal, fast, and extensible Rust DICOM toolkit for automating and optimizing DICOM workflows
+# Project Overview
+**pulsedcm** is a high-performance, memory-safe Rust toolkit for DICOM automation and AI-ready workflows.  
+Designed for researchers, imaging scientists, and developers working with large volumes of medical imaging data.
 
-# Usage
-## CLI
+It focuses on being:
+
+- ⚡ **Blazingly Fast** – optimized for parallel I/O, tag parsing, anonymization, and PNG export
+- 🦀 **Safe** – uses Rust’s guarantees to avoid crashes and undefined behavior in production
+- 🧱 **Modular & Scalable** – structured as a set of composable crates for integration or expansion
+
+
+I plan to build this to be accelerating workflows whether it be machine learning or research toolchain and avoid bottlenecking on DICOM parts/exchanges.
+
+
+<details> 
+<summary> <h2> Usage </h2> </summary>
+
+
 ```bash
-rdicom-lite [PATH] [COMMAND] [MODE] [EXTRA]
+pulsedcm [PATH] [COMMAND] [MODE] [EXTRA]
 ```
-## ⚙ Arguments
+### ⚙ Arguments
 
 | Argument   | Description                                                                                  |
 |------------|----------------------------------------------------------------------------------------------|
@@ -16,11 +29,11 @@ rdicom-lite [PATH] [COMMAND] [MODE] [EXTRA]
 | `EXTRA`    | Optional, command & mode-specific arguments (e.g., exporting).                             |
 
 <details>
-<summary>🔖 Tag Mode<\summary>
+<summary> <h3> 🔖 Tag Mode </h3> </summary>
 Use the `tags` command to display or export metadata.
 
 ```bash
-rdicom-lite <PATH> tags <MODE> [EXTRA]
+pulsedcm <PATH> tags <MODE> [EXTRA]
 ```
 
 #### Available `MODE` options:
@@ -33,7 +46,7 @@ rdicom-lite <PATH> tags <MODE> [EXTRA]
 
 ##### Example using `specific` mode:
 ```bash
-rdicom-lite ./scan.dcm tags PatientName,PatientID,StudyDate
+pulsedcm ./scan.dcm tags PatientName,PatientID,StudyDate
 ```
 
 #### Available `EXTRA` options
@@ -51,15 +64,17 @@ The outputed data consists of:
 - vr
 - value
 
-<\details>
-###  View Mode
+</details>
+<details>
+
+<summary> <h3> 🖼 View Mode </h3> </summary>
 
 **Warning:** As using the dicom-rs crate, the view mode is restricted and unable to decode JPEG 2000 Lossless compression as of now.
 
 Use the `view` command to render DICOM slices as PNGs and open them with your OS’s default image viewer.
 
 ```bash
-rdicom-lite <PATH> view [OPTIONS]
+pulsedcm <PATH> view [OPTIONS]
 
 ```
 #### Options
@@ -71,14 +86,22 @@ rdicom-lite <PATH> view [OPTIONS]
 | `--jobs <NUMBER>` | Number of threads to launch for parallel processing of slices.                                         |
 | `-h`, `--help`    | Print this help message.                                                                               |
 
+</details>
+<details>
+<summary> <h3> 🔒 <b>Ano</b>nymization / De-identification   </h3> </summary>
 
-### Anonymize Mode
 
-DICOM Supplement 142 Standard de-identification  
-**Warning:** No pixel modification for this version
+<div style="background-color: #cce5ff; border: 1px solid #b8daff; padding: 12px; border-radius: 4px; margin: 16px 0;">
+ℹ️ <b>Note</b>: This is using the DICOM Supplement 142 Standard de-identification methods.
+</div>
+<div style="background-color: #fff3cd; border: 1px solid #ffeeba; padding: 12px; border-radius: 4px; margin: 16px 0;">
+⚠️ <b>Warning</b>: No pixel modification for this version.
+</div>
+
+<h5>Usage</h5>
 
 ```bash
-rdicom-lite <PATH> ano [OPTIONS]
+pulsedcm <PATH> ano [OPTIONS]
 ```
 
 #### Options
@@ -109,7 +132,14 @@ rdicom-lite <PATH> ano [OPTIONS]
 | `moderate` | Also remove institution and device information.        |
 | `strict`   | Maximum removal: leaves only technical/essential data. |
 
-# Goals
+
+
+</details>
+</details>
+
+<details>
+<summary> <h2> 🎯 Roadmap & Progress </h2> </summary>
+
 ## Base of CLI (Goals for v0.1)
 - [x] tags:
     - [x] all  : Dumps all tags
@@ -120,18 +150,20 @@ rdicom-lite <PATH> ano [OPTIONS]
 
 
 ## Intermediate (Goals for v0.2)
-#### CLI
-- [ ] compress / decompress
-- [ ] edit: Allow to edit metadata -> Open a text editor (Vim/VScode/Notepad)
-#### Concept
 - [ ]: Feature-Gated Modules: creating crates modules to add for a personalized executable.
+- [ ]: Optimize: tags
+- [ ]: Optimize: view
+- [ ]: Optimize: ano
 
 ## Advanced (Goals for v0.3)
 #### CLI
-- [ ] validation: compare two files and report changes (tags and pixels)
 - [ ] PACS Interop:
     - [ ] send: Send to a server
     - [ ] recv: Declare a server 
 
 ## Extensions & Polish
 - [ ] Implement DICOMWeb
+</details>
+
+
+
