@@ -7,6 +7,7 @@ use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH, Duration};
 use std::process::Command;
 
+use std::sync::Mutex;
 use rayon;
 use rayon::prelude::*;
 
@@ -51,6 +52,10 @@ struct TagsArgs {
         value_parser = parse_tag_flags)
     ]
     kind: TagFlags,
+
+    /// Number of threads to launch to process
+    #[arg(long, value_name="NUMBER")]
+    jobs: Option<u8>,
 
     /// Export all output as a Serialized JSON
     #[arg(long, value_name="FILE")]
@@ -278,6 +283,7 @@ fn parse_actions(input: &str) -> Result<Actions, String>{
         }
     }
 }
+
 fn parse_policy(input: &str) -> Result<Policy, String>{
     match input.to_lowercase().as_str() {
         "basic"    => Ok(Policy::Basic) ,
@@ -322,41 +328,53 @@ fn list_all_files(user_path: &str) -> Vec<String>{
 fn tags_handling(path: &str, args: &TagsArgs){
 
     let files: Vec<String> = list_all_files(path);
-    let mut export_data: Vec<SerializableDicomEntry> = Vec::new();
+    let jobs : u8 = jobs_handling(args.jobs, files.len());
 
+    let mut export_data = Mutex::new(Vec::<SerializableDicomEntry>::new());
     let to_display = args.csv.is_some() || args.json.is_some();
 
-    for f in files {
-        let path: &str = f.as_str();
-        if !to_display {
-            println!("[{}]----", path);
+
+
+    let thread_pool = rayon::ThreadPoolBuilder::new().num_threads(jobs as usize).build().unwrap();
+    thread_pool.install(|| {
+        files.par_iter().for_each(|f| {
+            let mut out_string = String::new();
+            let path: &str = f.as_str();
+            if !to_display {
+                out_string.push_str(&format!("[{}]----\n", path));
+            }
+
+            let obj = match open_file(path) {
+                Ok(o) => o,
+                Err(e) => {
+                    out_string.push_str(&format!("Can't open file: {}\n", e));
+                    return;
+                }, 
+            };
+            export_data.lock().unwrap().extend(
+                match &args.kind {
+                    TagFlags::All =>  all_tagging(path, &obj, to_display, &mut out_string),
+                    TagFlags::Short =>  short_tagging(path, &obj, to_display, &mut out_string),
+                    TagFlags::Specific(keys) =>  specific_tagging(path, &keys, &obj, to_display, &mut out_string)
+            }
+            );
+            println!("{}", out_string);
+        });
+        if let Some(json_path) = args.json.clone() {
+            write_tag_files("json", json_path, &export_data);
         }
 
-        let obj = match open_file(path) {
-            Ok(o) => o,
-            Err(_) => panic!("Can't open the file"),
-        };
-        export_data.extend(
-            match &args.kind {
-                TagFlags::All =>  all_tagging(path, &obj, to_display),
-                TagFlags::Short =>  short_tagging(path, &obj, to_display),
-                TagFlags::Specific(keys) =>  specific_tagging(path, &keys, &obj, to_display)
-            }
-        );
-    }
-    if let Some(json_path) = args.json.clone() {
-        write_tag_files("json", json_path, &export_data);
-    }
-    
-    if let Some(csv_path) = args.csv.clone() {
-        write_tag_files("csv", csv_path, &export_data);
-    }
+        if let Some(csv_path) = args.csv.clone() {
+            write_tag_files("csv", csv_path, &export_data);
+        }
+    });
+
 
 
 
 }
 
-fn write_tag_files(extension_type: &str, mut arg_clone: PathBuf, export_data: &[SerializableDicomEntry]){
+fn write_tag_files(extension_type: &str, mut arg_clone: PathBuf, export_data: &Mutex<Vec<SerializableDicomEntry>>){
     if arg_clone.extension().is_none() {
         arg_clone.set_extension(extension_type);
     }
@@ -369,7 +387,7 @@ fn write_tag_files(extension_type: &str, mut arg_clone: PathBuf, export_data: &[
     }
     let file = File::create(&arg_clone).unwrap();
     let mut wrt = Writer::from_writer(file);
-    for entry in export_data {
+    for entry in export_data.lock().unwrap().iter() {
         wrt.serialize(entry).unwrap();
     }
 
@@ -380,7 +398,7 @@ fn write_tag_files(extension_type: &str, mut arg_clone: PathBuf, export_data: &[
 
 }
 
-fn all_tagging(path: &str, obj: &FileDicomObject<InMemDicomObject<StandardDataDictionary>>, to_display: bool) -> Vec<SerializableDicomEntry>{
+fn all_tagging(path: &str, obj: &FileDicomObject<InMemDicomObject<StandardDataDictionary>>, to_display: bool, out_string: &mut String) -> Vec<SerializableDicomEntry>{
     let mut output : Vec<SerializableDicomEntry> = Vec::new();
     for element in obj.into_iter() {
         let tag: Tag = element.header().tag;
@@ -403,14 +421,14 @@ fn all_tagging(path: &str, obj: &FileDicomObject<InMemDicomObject<StandardDataDi
             }
         );
         if !to_display {
-            print_colorize(tag, vr.to_string(),value.as_str(), name);
+            print_colorize(tag, vr.to_string(),value.as_str(), name, out_string);
         }
     }
     return output;
 
 }
 
-fn short_tagging(path: &str, obj: &FileDicomObject<InMemDicomObject<StandardDataDictionary>>, to_display: bool) -> Vec<SerializableDicomEntry>{
+fn short_tagging(path: &str, obj: &FileDicomObject<InMemDicomObject<StandardDataDictionary>>, to_display: bool, out_string: &mut String) -> Vec<SerializableDicomEntry>{
     let mut output: Vec<SerializableDicomEntry> = Vec::new();
     let short_tags = [
         Tag(0x0010, 0x0010), // PatientName
@@ -440,14 +458,14 @@ fn short_tagging(path: &str, obj: &FileDicomObject<InMemDicomObject<StandardData
                 }
             );
             if !to_display {
-                print_colorize(*tag, vr.to_string(),value.as_str(), name);
+                print_colorize(*tag, vr.to_string(),value.as_str(), name, out_string);
             }
         }
     }
     return output;
 }
 
-fn specific_tagging(path: &str, input_kind: &[String], obj: &FileDicomObject<InMemDicomObject<StandardDataDictionary>>, to_display: bool)-> Vec<SerializableDicomEntry>{
+fn specific_tagging(path: &str, input_kind: &[String], obj: &FileDicomObject<InMemDicomObject<StandardDataDictionary>>, to_display: bool, out_string: &mut String)-> Vec<SerializableDicomEntry>{
     let mut output: Vec<SerializableDicomEntry> = Vec::new();
     for element in obj.into_iter() {
         let tag: Tag = element.header().tag;
@@ -472,14 +490,14 @@ fn specific_tagging(path: &str, input_kind: &[String], obj: &FileDicomObject<InM
                 }
             );
             if !to_display {
-                print_colorize(tag, vr.to_string(),value.as_str(), name);
+                print_colorize(tag, vr.to_string(),value.as_str(), name, out_string);
             }
         }
     }
     return output;
 }
 
-fn print_colorize(tag: Tag, vr: &str, value: &str, name: &str){
+fn print_colorize(tag: Tag, vr: &str, value: &str, name: &str, out_string: &mut String){
     let color = if is_phi_tag(tag) {
         "\x1b[1;91m" // Red
     } else if is_warning_tag(tag) {
@@ -494,16 +512,30 @@ fn print_colorize(tag: Tag, vr: &str, value: &str, name: &str){
     } else {
         "\x1b[0m"
     };
-    println!(
-        "{}({:04X},{:04X})\x1b[0m {}{:<2} {:<30} {}\x1b[0m",
-        color,
-        tag.group(),
-        tag.element(),
-        greyed,
-        vr,
-        name,
-        value
-    );
+    if out_string.is_empty(){
+        println!(
+            "{}({:04X},{:04X})\x1b[0m {}{:<2} {:<30} {}\x1b[0m",
+            color,
+            tag.group(),
+            tag.element(),
+            greyed,
+            vr,
+            name,
+            value
+        );
+    }
+    else {
+        out_string.push_str(&format!(
+                "{}({:04X},{:04X})\x1b[0m {}{:<2} {:<30} {}\x1b[0m\n",
+                color,
+                tag.group(),
+                tag.element(),
+                greyed,
+                vr,
+                name,
+                value
+        ));
+    }
 
 
 }
@@ -710,7 +742,8 @@ fn ano_threaded_function(idx: usize, file: &String, out: &mut PathBuf, dry:bool 
                 .to_str()
                 .map(|cow| cow.into_owned())
                 .unwrap_or_else(|_| "[Binary]".to_string());
-            print_colorize(tag, vr.to_string(), value.as_str(), name);
+            let mut s = String::new();
+            print_colorize(tag, vr.to_string(), value.as_str(), name, &mut s);
         }
         return; 
     }
