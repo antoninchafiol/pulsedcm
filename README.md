@@ -15,7 +15,8 @@ rdicom-lite [PATH] [COMMAND] [MODE] [EXTRA]
 | `MODE`     | Defines how metadata should be displayed. **See specific command behaviour for mode and extra.**|
 | `EXTRA`    | Optional, command & mode-specific arguments (e.g., exporting).                             |
 
-### 🔖 Tag Mode
+<details>
+<summary>🔖 Tag Mode<\summary>
 Use the `tags` command to display or export metadata.
 
 ```bash
@@ -50,6 +51,7 @@ The outputed data consists of:
 - vr
 - value
 
+<\details>
 ###  View Mode
 
 **Warning:** As using the dicom-rs crate, the view mode is restricted and unable to decode JPEG 2000 Lossless compression as of now.
