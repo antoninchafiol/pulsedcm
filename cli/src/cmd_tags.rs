@@ -1,7 +1,10 @@
 use clap::Args;
+use pulsedcm_commands_tags::{run as tag_run, TagFlags};
+use std::path::PathBuf;
+
 
 #[derive(Args, Debug)]
-struct TagsArgs {
+pub struct TagsArgs {
     /// Type of args to provide between all,short and specific tagname
     #[arg(
         default_value = "all",
@@ -23,16 +26,6 @@ struct TagsArgs {
     
 }
 
-#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
-enum TagFlags {
-    /// All tags
-    All,
-    /// Important tags (Like PatientName, Modality, SeriesDescription)
-    Short,
-    /// Comma-separated list of specific DICOM tag keywords (e.g. PatientName,StudyDate)
-    Specific(Vec<String>),
-}
-
 fn parse_tag_flags(s: &str) -> Result<TagFlags, String> {
     match s.to_lowercase().as_str() {
         "all" => Ok(TagFlags::All),
@@ -52,3 +45,19 @@ fn parse_tag_flags(s: &str) -> Result<TagFlags, String> {
         }
     }
 }
+
+
+pub fn run(path: &str, args: TagsArgs){
+    tag_run(
+        path, 
+        args.kind.clone(), 
+        args.jobs.unwrap_or(1).clone(),
+        args.json.clone(),
+        args.csv.clone()
+    );
+
+}
+
+
+
+

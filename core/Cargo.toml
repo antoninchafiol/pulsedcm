@@ -9,5 +9,5 @@ dicom-object = "0.8.1"
 dicom-core = "0.8.1"
 dicom-dictionary-std = "0.8.0"
 dicom-pixeldata = { version = "0.8.1", features=['image']}
-
+serde = { version = "1", features = ["derive"] }
 

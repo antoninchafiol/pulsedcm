@@ -1,6 +1,6 @@
 use std::fs;
 use std::path::Path;
-
+use serde::Serialize;
 
 fn list_all_files(user_path: &str) -> Vec<String>{
     let mut res: Vec<String> = Vec::new();
@@ -19,4 +19,13 @@ fn list_all_files(user_path: &str) -> Vec<String>{
         }
     }
     res
+}
+
+#[derive(Serialize)]
+struct SerializableDicomEntry {
+    filename: String,
+    name: String,
+    tag: String,
+    vr: String,
+    value: String,
 }

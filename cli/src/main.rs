@@ -1,10 +1,18 @@
+mod cmd_tags;
+
 use clap::{Parser, Subcommand};
-use cmd_tags::*;
+use cmd_tags::TagsArgs;
+
+
 
 #[derive(Parser)]
 #[command(name = "pulsedcm")]
 #[command(about = "DICOM CLI Tool", long_about = None)]
 struct Cli {
+    /// Path to the dcm file/folder
+    #[arg(value_name = "PATH", default_value=".")]
+    path: String,
+
     #[command(subcommand)]
     command: Commands,
 }
@@ -19,6 +27,6 @@ fn main() {
     let cli = Cli::parse();
 
     match cli.command {
-        Commands::Tags(args) => pulsedcm_commands_tags::run::run(args),
+        Commands::Tags(args) => cmd_tags::run(cli.path.as_str(), args),
     }
 }
