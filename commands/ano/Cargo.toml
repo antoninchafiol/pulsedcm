@@ -1,0 +1,8 @@
+[package]
+name = "pulsedcm-commands-ano"
+version = "0.2.0"
+description = "De-identification of DICOM files"
+edition = "2021"
+
+[dependencies]
+pulsedcm-core = { path = "../../core" }

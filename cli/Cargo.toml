@@ -1,0 +1,25 @@
+[package]
+name = "pulsedcm-cli"
+description = "CLI part of pulsedcm"
+version = "0.2.0"
+edition = "2021"
+
+[dependencies]
+pulsedcm-core = { path = "../core" }
+pulsedcm-commands-tags = { path = "../commands/tags" }
+pulsedcm-commands-view = { path = "../commands/view" }
+pulsedcm-commands-ano = { path = "../commands/ano" }
+
+# CLI Arguements
+clap = { version = "4", features = ["derive"] }
+
+# Output possible (CSV/JSON)
+csv = "1"
+serde = { version = "1", features = ["derive"] }
+
+# Threading
+rayon = "1"
+
+# I/O Handling
+tempfile = "3"
+

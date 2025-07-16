@@ -1,0 +1,13 @@
+[package]
+name = "pulsedcm-core"
+version = "0.2.0"
+description = "Core models, processes that're common to each commands/processes"
+edition = "2024"
+[dependencies]
+# DICOM related crates
+dicom-object = "0.8.1"                                  
+dicom-core = "0.8.1"
+dicom-dictionary-std = "0.8.0"
+dicom-pixeldata = { version = "0.8.1", features=['image']}
+
+

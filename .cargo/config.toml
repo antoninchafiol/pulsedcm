@@ -1,0 +1,2 @@
+[build]
+default-run = "cli"

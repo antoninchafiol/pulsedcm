@@ -1,0 +1,8 @@
+[package]
+name = "pulsedcm-commands-tags"
+version = "0.2.0"
+description = "Parsing the tags in a DICOM file"
+edition = "2021"
+
+[dependencies]
+pulsedcm-core = { path = "../../core" }
