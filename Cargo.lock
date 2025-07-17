@@ -1188,7 +1188,9 @@ dependencies = [
 name = "pulsedcm-commands-tags"
 version = "0.2.0"
 dependencies = [
+ "csv",
  "pulsedcm-core",
+ "rayon",
 ]
 
 [[package]]
@@ -1206,6 +1208,7 @@ dependencies = [
  "dicom-dictionary-std",
  "dicom-object",
  "dicom-pixeldata",
+ "rayon",
  "serde",
 ]
 

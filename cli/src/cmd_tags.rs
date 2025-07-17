@@ -1,7 +1,8 @@
 use clap::Args;
-use pulsedcm_commands_tags::{run as tag_run, TagFlags};
 use std::path::PathBuf;
 
+use pulsedcm_commands_tags::{run as tag_run, TagFlags};
+use pulsedcm_core::jobs_handling;
 
 #[derive(Args, Debug)]
 pub struct TagsArgs {
@@ -14,7 +15,7 @@ pub struct TagsArgs {
 
     /// Number of threads to launch to process
     #[arg(long, value_name="NUMBER")]
-    jobs: Option<u8>,
+    jobs: Option<usize>,
 
     /// Export all output as a Serialized JSON
     #[arg(long, value_name="FILE")]
@@ -51,7 +52,7 @@ pub fn run(path: &str, args: TagsArgs){
     tag_run(
         path, 
         args.kind.clone(), 
-        args.jobs.unwrap_or(1).clone(),
+        args.jobs.clone(),
         args.json.clone(),
         args.csv.clone()
     );

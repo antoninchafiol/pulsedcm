@@ -10,4 +10,5 @@ dicom-core = "0.8.1"
 dicom-dictionary-std = "0.8.0"
 dicom-pixeldata = { version = "0.8.1", features=['image']}
 serde = { version = "1", features = ["derive"] }
+rayon = "1.10.0"
 

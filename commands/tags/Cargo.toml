@@ -2,7 +2,9 @@
 name = "pulsedcm-commands-tags"
 version = "0.2.0"
 description = "Parsing the tags in a DICOM file"
-edition = "2021"
+edition = "2024"
 
 [dependencies]
 pulsedcm-core = { path = "../../core" }
+rayon = "1.10.0"
+csv = "1.3.1"
