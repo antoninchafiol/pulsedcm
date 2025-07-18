@@ -20,7 +20,7 @@ pub fn run(path: &str, kind: TagFlags, jobs: Option<usize>, json: Option<PathBuf
     let files: Vec<String> = list_all_files(path);
     let jobs : usize = jobs_handling(jobs, files.len());
     
-    let mut export_data = Mutex::new(Vec::<SerializableDicomEntry>::new());
+    let export_data = Mutex::new(Vec::<SerializableDicomEntry>::new());
     let to_display = csv.is_some() || json.is_some();
 
 
@@ -34,7 +34,7 @@ pub fn run(path: &str, kind: TagFlags, jobs: Option<usize>, json: Option<PathBuf
                 out_string.push_str(&format!("[{}]----\n", path));
             }
 
-            let obj = match open_file(path) {
+            let obj = match open_dcm_file(path) {
                 Ok(o) => o,
                 Err(e) => {
                     out_string.push_str(&format!("Can't open file: {}\n", e));

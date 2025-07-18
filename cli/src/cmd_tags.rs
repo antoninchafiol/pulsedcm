@@ -2,7 +2,6 @@ use clap::Args;
 use std::path::PathBuf;
 
 use pulsedcm_commands_tags::{run as tag_run, TagFlags};
-use pulsedcm_core::jobs_handling;
 
 #[derive(Args, Debug)]
 pub struct TagsArgs {
