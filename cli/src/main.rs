@@ -1,9 +1,6 @@
-mod cmd_tags;
+mod commands;
 
-use clap::{Parser, Subcommand};
-use cmd_tags::TagsArgs;
-
-
+use clap::{Parser};
 
 #[derive(Parser)]
 #[command(name = "pulsedcm")]
@@ -14,19 +11,16 @@ struct Cli {
     path: String,
 
     #[command(subcommand)]
-    command: Commands,
+    command: commands::Commands,
 }
 
-#[derive(Subcommand)]
-enum Commands {
-    Tags(TagsArgs),
-}
+//#[derive(Subcommand)]
+//enum Commands {
+//    Tags(TagsArgs),
+//}
 
 
 fn main() {
     let cli = Cli::parse();
-
-    match cli.command {
-        Commands::Tags(args) => cmd_tags::run(cli.path.as_str(), args),
-    }
+    commands::handling(&cli.path, cli.command);
 }
