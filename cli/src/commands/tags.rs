@@ -55,7 +55,6 @@ pub fn run(path: &str, args: TagsArgs){
         args.json.clone(),
         args.csv.clone()
     );
-
 }
 
 

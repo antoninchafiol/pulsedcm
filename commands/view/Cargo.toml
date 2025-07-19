@@ -6,3 +6,5 @@ edition = "2021"
 
 [dependencies]
 pulsedcm-core = { path = "../../core" }
+rayon = "1.10.0"
+tempfile = "3.20.0"

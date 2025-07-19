@@ -6,6 +6,7 @@ use rayon;
 pub use dicom_object::{Tag, open_file, FileDicomObject, InMemDicomObject};
 pub use dicom_dictionary_std::{StandardDataDictionary};
 pub use dicom_core::DataDictionary;
+pub use dicom_pixeldata::PixelDecoder;
 
 pub use std::time::{SystemTime, UNIX_EPOCH};
 pub use std::fs::File;

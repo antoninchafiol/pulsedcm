@@ -14,11 +14,6 @@ struct Cli {
     command: commands::Commands,
 }
 
-//#[derive(Subcommand)]
-//enum Commands {
-//    Tags(TagsArgs),
-//}
-
 
 fn main() {
     let cli = Cli::parse();
