@@ -150,7 +150,7 @@ pulsedcm <PATH> ano [OPTIONS]
 
 
 ## Intermediate (Goals for v0.2)
-- [ ]: Feature-Gated Modules: creating crates modules to add for a personalized executable.
+- [x]: Feature-Gated Modules: creating crates modules to add for a personalized executable.
 - [ ]: Optimize: tags
 - [ ]: Optimize: view
 - [ ]: Optimize: ano
