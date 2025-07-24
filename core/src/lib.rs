@@ -1,11 +1,13 @@
 use std::fs;
 use serde::Serialize;
+use std::io::{self, Write};
 
-use rayon;
+pub use rayon;
+pub use rayon::prelude::*;
 
 pub use dicom_object::{Tag, open_file, FileDicomObject, InMemDicomObject};
 pub use dicom_dictionary_std::{StandardDataDictionary};
-pub use dicom_core::DataDictionary;
+pub use dicom_core::{DataDictionary, PrimitiveValue};
 pub use dicom_pixeldata::PixelDecoder;
 
 pub use std::time::{SystemTime, UNIX_EPOCH};
@@ -56,4 +58,95 @@ pub fn jobs_handling(jobs: Option<usize>, max_file: usize) -> usize {
     else {
         return j;
     }
+}
+
+pub fn ask_yes_no(question: &str) -> bool {
+    print!("{} Y/N: ", question);
+    let _ = io::stdout().flush();
+
+    let mut input = String::new();
+    io::stdin().read_line(&mut input).unwrap();
+
+    matches!(input.trim().to_lowercase().as_str(), "y" | "yes")
+}
+
+
+pub fn print_colorize(tag: Tag, vr: &str, value: &str, name: &str, out_string: &mut String){
+    let color = if is_phi_tag(tag) {
+        "\x1b[1;91m" // Red
+    } else if is_warning_tag(tag) {
+        "\x1b[1;93m" // Yellow/Orange
+    } else if value == "[Binary]" || name == "Unknown" {
+        "\x1b[90m" // Grey
+    } else {
+        "\x1b[1m"  // Bold default
+    };
+    let greyed =  if value == "[Binary]" || name == "Unknown" {
+        "\x1b[90m" // Grey
+    } else {
+        "\x1b[0m"
+    };
+    if out_string.is_empty(){
+        println!(
+            "{}({:04X},{:04X})\x1b[0m {}{:<2} {:<30} {}\x1b[0m",
+            color,
+            tag.group(),
+            tag.element(),
+            greyed,
+            vr,
+            name,
+            value
+        );
+    }
+    else {
+        out_string.push_str(&format!(
+                "{}({:04X},{:04X})\x1b[0m {}{:<2} {:<30} {}\x1b[0m\n",
+                color,
+                tag.group(),
+                tag.element(),
+                greyed,
+                vr,
+                name,
+                value
+        ));
+    }
+}
+
+fn is_phi_tag(tag: Tag) -> bool {
+    matches!(tag,
+        Tag(0x0010, 0x0010) // Patient's Name
+        | Tag(0x0010, 0x0020) // Patient ID
+        | Tag(0x0010, 0x0030) // Patient's Birth Date
+        | Tag(0x0010, 0x0032) // Patient's Birth Time
+        | Tag(0x0010, 0x0040) // Patient's Sex
+        | Tag(0x0010, 0x1000) // Other Patient IDs
+        | Tag(0x0010, 0x1001) // Other Patient Names
+        | Tag(0x0010, 0x1005) // Patient's Birth Name
+        | Tag(0x0010, 0x1060) // Patient’s Mother's Birth Name
+        | Tag(0x0010, 0x2154) // Patient's Telephone Numbers
+        | Tag(0x0010, 0x2180) // Occupation
+        | Tag(0x0010, 0x1040) // Patient's Address
+        | Tag(0x0038, 0x0300) // Current Patient Location
+        | Tag(0x0038, 0x0400) // Patient's Institution Residence
+                              //
+    )
+}
+
+fn is_warning_tag(tag: Tag) -> bool {
+    matches!(tag,
+        Tag(0x0008, 0x0050) // Accession Number
+        | Tag(0x0008, 0x0080) // Institution Name
+        | Tag(0x0008, 0x0081) // Institution Address
+        | Tag(0x0008, 0x0090) // Referring Physician’s Name
+        | Tag(0x0008, 0x0092) // Referring Physician’s Address
+        | Tag(0x0008, 0x0094) // Referring Physician’s Telephone Numbers
+        | Tag(0x0008, 0x1010) // Station Name
+        | Tag(0x0008, 0x1040) // Institutional Department Name
+        | Tag(0x0008, 0x1050) // Performing Physician’s Name
+        | Tag(0x0008, 0x1070) // Operator’s Name
+        | Tag(0x0008, 0x1030) // Study Description
+        | Tag(0x0008, 0x103E) // Series Description
+        | Tag(0x0018, 0x1000) // Device Serial Number
+        | Tag(0x0018, 0x1030) // Protocol Name
+    )
 }
