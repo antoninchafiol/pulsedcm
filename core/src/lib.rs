@@ -1,34 +1,39 @@
-use std::fs;
 use serde::Serialize;
+use std::ffi::OsStr;
+use std::fs;
 use std::io::{self, Write};
 
 pub use rayon;
 pub use rayon::prelude::*;
 
-pub use dicom_object::{Tag, open_file, FileDicomObject, InMemDicomObject};
-pub use dicom_dictionary_std::{StandardDataDictionary};
 pub use dicom_core::{DataDictionary, PrimitiveValue};
+pub use dicom_dictionary_std;
+pub use dicom_dictionary_std::StandardDataDictionary;
+pub use dicom_object::{open_file, FileDicomObject, InMemDicomObject, OpenFileOptions, Tag};
 pub use dicom_pixeldata::PixelDecoder;
 
-pub use std::time::{SystemTime, UNIX_EPOCH};
 pub use std::fs::File;
 pub use std::path::Path;
+pub use std::time::{SystemTime, UNIX_EPOCH};
 
-pub fn list_all_files(user_path: &str) -> Vec<String>{
+use walkdir::{self, DirEntry, WalkDir};
+
+pub fn list_all_files(user_path: &str) -> Vec<String> {
+    // TODO: Change to a Result and check if folder/file exists
     let mut res: Vec<String> = Vec::new();
-    let pa = Path::new(user_path);
-    if pa.is_file(){
-        if pa.extension().unwrap() == "dcm" {
-            res.push(user_path.to_string());
-        } 
-    } else {
-        for p in fs::read_dir(user_path).unwrap(){
-            if let Ok(p) = p {
-                if let Some(p) = p.path().to_str(){
-                    res.extend(list_all_files(p));
-                }
-            }
-        }
+
+    for entry in WalkDir::new(user_path)
+        .into_iter()
+        .filter_map(|e| e.ok())
+        .filter(|e| {
+            e.path()
+                .extension()
+                .and_then(|e| e.to_str())
+                .map(|e| e.eq_ignore_ascii_case("dcm"))
+                .unwrap_or(false)
+        })
+    {
+        res.push(entry.path().to_str().unwrap().to_string());
     }
     res
 }
@@ -50,12 +55,10 @@ pub fn jobs_handling(jobs: Option<usize>, max_file: usize) -> usize {
         // MAX NUMBER OF THREADS POSSIBLE BY MACHINEa
         if max_file > rayon::max_num_threads() {
             return rayon::max_num_threads();
+        } else {
+            return max_file;
         }
-        else {
-            return max_file;  
-        }
-    }
-    else {
+    } else {
         return j;
     }
 }
@@ -70,8 +73,7 @@ pub fn ask_yes_no(question: &str) -> bool {
     matches!(input.trim().to_lowercase().as_str(), "y" | "yes")
 }
 
-
-pub fn print_colorize(tag: Tag, vr: &str, value: &str, name: &str, out_string: &mut String){
+pub fn print_colorize(tag: Tag, vr: &str, value: &str, name: &str, out_string: &mut String) {
     let color = if is_phi_tag(tag) {
         "\x1b[1;91m" // Red
     } else if is_warning_tag(tag) {
@@ -79,14 +81,14 @@ pub fn print_colorize(tag: Tag, vr: &str, value: &str, name: &str, out_string: &
     } else if value == "[Binary]" || name == "Unknown" {
         "\x1b[90m" // Grey
     } else {
-        "\x1b[1m"  // Bold default
+        "\x1b[1m" // Bold default
     };
-    let greyed =  if value == "[Binary]" || name == "Unknown" {
+    let greyed = if value == "[Binary]" || name == "Unknown" {
         "\x1b[90m" // Grey
     } else {
         "\x1b[0m"
     };
-    if out_string.is_empty(){
+    if out_string.is_empty() {
         println!(
             "{}({:04X},{:04X})\x1b[0m {}{:<2} {:<30} {}\x1b[0m",
             color,
@@ -97,23 +99,23 @@ pub fn print_colorize(tag: Tag, vr: &str, value: &str, name: &str, out_string: &
             name,
             value
         );
-    }
-    else {
+    } else {
         out_string.push_str(&format!(
-                "{}({:04X},{:04X})\x1b[0m {}{:<2} {:<30} {}\x1b[0m\n",
-                color,
-                tag.group(),
-                tag.element(),
-                greyed,
-                vr,
-                name,
-                value
+            "{}({:04X},{:04X})\x1b[0m {}{:<2} {:<30} {}\x1b[0m\n",
+            color,
+            tag.group(),
+            tag.element(),
+            greyed,
+            vr,
+            name,
+            value
         ));
     }
 }
 
 fn is_phi_tag(tag: Tag) -> bool {
-    matches!(tag,
+    matches!(
+        tag,
         Tag(0x0010, 0x0010) // Patient's Name
         | Tag(0x0010, 0x0020) // Patient ID
         | Tag(0x0010, 0x0030) // Patient's Birth Date
@@ -133,7 +135,8 @@ fn is_phi_tag(tag: Tag) -> bool {
 }
 
 fn is_warning_tag(tag: Tag) -> bool {
-    matches!(tag,
+    matches!(
+        tag,
         Tag(0x0008, 0x0050) // Accession Number
         | Tag(0x0008, 0x0080) // Institution Name
         | Tag(0x0008, 0x0081) // Institution Address

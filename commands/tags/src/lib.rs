@@ -1,10 +1,10 @@
 use pulsedcm_core::*;
+use rayon::prelude::*;
 use std::path::PathBuf;
 use std::sync::Mutex;
-use rayon::prelude::*;
 
-use pulsedcm_core::{open_file as open_dcm_file, Tag, StandardDataDictionary};
 use csv::Writer;
+use pulsedcm_core::{open_file as open_dcm_file, StandardDataDictionary, Tag};
 
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
 pub enum TagFlags {
@@ -16,16 +16,24 @@ pub enum TagFlags {
     Specific(Vec<String>),
 }
 
-pub fn run(path: &str, kind: TagFlags, jobs: Option<usize>, json: Option<PathBuf>, csv: Option<PathBuf>){
+pub fn run(
+    path: &str,
+    kind: TagFlags,
+    with_pixel_data: bool,
+    jobs: Option<usize>,
+    json: Option<PathBuf>,
+    csv: Option<PathBuf>,
+) {
     let files: Vec<String> = list_all_files(path);
-    let jobs : usize = jobs_handling(jobs, files.len());
-    
+    let jobs: usize = jobs_handling(jobs, files.len());
+
     let export_data = Mutex::new(Vec::<SerializableDicomEntry>::new());
     let to_display = csv.is_some() || json.is_some();
 
-
-
-    let thread_pool = rayon::ThreadPoolBuilder::new().num_threads(jobs as usize).build().unwrap();
+    let thread_pool = rayon::ThreadPoolBuilder::new()
+        .num_threads(jobs)
+        .build()
+        .unwrap();
     thread_pool.install(|| {
         files.par_iter().for_each(|f| {
             let mut out_string = String::new();
@@ -34,20 +42,28 @@ pub fn run(path: &str, kind: TagFlags, jobs: Option<usize>, json: Option<PathBuf
                 out_string.push_str(&format!("[{}]----\n", path));
             }
 
-            let obj = match open_dcm_file(path) {
+            // Skipping pixel data when specified or exporting to JSON/CSV
+            let obj = if !with_pixel_data || to_display {
+                OpenFileOptions::new()
+                    .read_until(dicom_dictionary_std::tags::PIXEL_DATA)
+                    .open_file(path)
+            } else {
+                open_dcm_file(path)
+            };
+            let obj = match obj {
                 Ok(o) => o,
                 Err(e) => {
                     out_string.push_str(&format!("Can't open file: {}\n", e));
                     return;
-                }, 
+                }
             };
-            export_data.lock().unwrap().extend(
-                match &kind {
-                    TagFlags::All =>  all_tagging(path, &obj, to_display, &mut out_string),
-                    TagFlags::Short =>  short_tagging(path, &obj, to_display, &mut out_string),
-                    TagFlags::Specific(keys) =>  specific_tagging(path, &keys, &obj, to_display, &mut out_string)
-            }
-            );
+            export_data.lock().unwrap().extend(match &kind {
+                TagFlags::All => all_tagging(path, &obj, to_display, &mut out_string),
+                TagFlags::Short => short_tagging(path, &obj, to_display, &mut out_string),
+                TagFlags::Specific(keys) => {
+                    specific_tagging(path, &keys, &obj, to_display, &mut out_string)
+                }
+            });
             println!("{}", out_string);
         });
         if let Some(json_path) = json.clone() {
@@ -60,12 +76,19 @@ pub fn run(path: &str, kind: TagFlags, jobs: Option<usize>, json: Option<PathBuf
     });
 }
 
-fn write_tag_files(extension_type: &str, mut arg_clone: PathBuf, export_data: &Mutex<Vec<SerializableDicomEntry>>){
+fn write_tag_files(
+    extension_type: &str,
+    mut arg_clone: PathBuf,
+    export_data: &Mutex<Vec<SerializableDicomEntry>>,
+) {
     if arg_clone.extension().is_none() {
         arg_clone.set_extension(extension_type);
     }
     if arg_clone.exists() {
-        let timestamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
+        let timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
         let stem = arg_clone.file_stem().unwrap_or_default().to_string_lossy();
         let parent = arg_clone.parent().unwrap_or_else(|| Path::new(""));
         let new_name = format!("{}_{}.{}", stem, timestamp, extension_type);
@@ -78,14 +101,21 @@ fn write_tag_files(extension_type: &str, mut arg_clone: PathBuf, export_data: &M
     }
 
     match wrt.flush() {
-        Ok(_o) => println!("\x1b[1;32mSuccessfully\x1b[0m saved CSV as \x1b[1m{:?} \x1b[0m", arg_clone),
-        Err(_e) => println!("Error when writing in file")
+        Ok(_o) => println!(
+            "\x1b[1;32mSuccessfully\x1b[0m saved CSV as \x1b[1m{:?} \x1b[0m",
+            arg_clone
+        ),
+        Err(_e) => println!("Error when writing in file"),
     }
-
 }
 
-fn all_tagging(path: &str, obj: &FileDicomObject<InMemDicomObject<StandardDataDictionary>>, to_display: bool, out_string: &mut String) -> Vec<SerializableDicomEntry>{
-    let mut output : Vec<SerializableDicomEntry> = Vec::new();
+fn all_tagging(
+    path: &str,
+    obj: &FileDicomObject<InMemDicomObject<StandardDataDictionary>>,
+    to_display: bool,
+    out_string: &mut String,
+) -> Vec<SerializableDicomEntry> {
+    let mut output: Vec<SerializableDicomEntry> = Vec::new();
     for element in obj.into_iter() {
         let tag: Tag = element.header().tag;
         let vr = element.header().vr();
@@ -93,28 +123,31 @@ fn all_tagging(path: &str, obj: &FileDicomObject<InMemDicomObject<StandardDataDi
             .by_tag(tag)
             .map(|entry| entry.alias)
             .unwrap_or("Unknown");
-        let value: String = element.value()
+        let value: String = element
+            .value()
             .to_str()
             .map(|cow| cow.into_owned())
             .unwrap_or_else(|_| "[Binary]".to_string());
-        output.push(
-            SerializableDicomEntry { 
-                filename: path.to_string(),
-                name: name.to_string(),
-                tag: format!("({:04X} {:04X})", tag.0, tag.1),
-                vr: vr.to_string().to_string(),
-                value: value.to_string() 
-            }
-        );
+        output.push(SerializableDicomEntry {
+            filename: path.to_string(),
+            name: name.to_string(),
+            tag: format!("({:04X} {:04X})", tag.0, tag.1),
+            vr: vr.to_string().to_string(),
+            value: value.to_string(),
+        });
         if !to_display {
-            print_colorize(tag, vr.to_string(),value.as_str(), name, out_string);
+            print_colorize(tag, vr.to_string(), value.as_str(), name, out_string);
         }
     }
     return output;
-
 }
 
-fn short_tagging(path: &str, obj: &FileDicomObject<InMemDicomObject<StandardDataDictionary>>, to_display: bool, out_string: &mut String) -> Vec<SerializableDicomEntry>{
+fn short_tagging(
+    path: &str,
+    obj: &FileDicomObject<InMemDicomObject<StandardDataDictionary>>,
+    to_display: bool,
+    out_string: &mut String,
+) -> Vec<SerializableDicomEntry> {
     let mut output: Vec<SerializableDicomEntry> = Vec::new();
     let short_tags = [
         Tag(0x0010, 0x0010), // PatientName
@@ -123,35 +156,40 @@ fn short_tagging(path: &str, obj: &FileDicomObject<InMemDicomObject<StandardData
         Tag(0x0008, 0x103E), // SeriesDescription
     ];
 
-    for tag in &short_tags{
-        if let Ok(element) = obj.element(*tag){
+    for tag in &short_tags {
+        if let Ok(element) = obj.element(*tag) {
             let vr = element.header().vr();
             let name = StandardDataDictionary
                 .by_tag(*tag)
                 .map(|entry| entry.alias)
                 .unwrap_or_else(|| "Unknown");
-            let value: String = element.value()
+            let value: String = element
+                .value()
                 .to_str()
                 .map(|cow| cow.into_owned())
                 .unwrap_or_else(|_| "[Binary]".to_string());
-            output.push(
-                SerializableDicomEntry { 
-                    filename: path.to_string(),
-                    name: name.to_string(),
-                    tag: format!("({:04X} {:04X})", tag.0, tag.1),
-                    vr: vr.to_string().to_string(),
-                    value: value.to_string() 
-                }
-            );
+            output.push(SerializableDicomEntry {
+                filename: path.to_string(),
+                name: name.to_string(),
+                tag: format!("({:04X} {:04X})", tag.0, tag.1),
+                vr: vr.to_string().to_string(),
+                value: value.to_string(),
+            });
             if !to_display {
-                print_colorize(*tag, vr.to_string(),value.as_str(), name, out_string);
+                print_colorize(*tag, vr.to_string(), value.as_str(), name, out_string);
             }
         }
     }
     return output;
 }
 
-fn specific_tagging(path: &str, input_kind: &[String], obj: &FileDicomObject<InMemDicomObject<StandardDataDictionary>>, to_display: bool, out_string: &mut String)-> Vec<SerializableDicomEntry>{
+fn specific_tagging(
+    path: &str,
+    input_kind: &[String],
+    obj: &FileDicomObject<InMemDicomObject<StandardDataDictionary>>,
+    to_display: bool,
+    out_string: &mut String,
+) -> Vec<SerializableDicomEntry> {
     let mut output: Vec<SerializableDicomEntry> = Vec::new();
     for element in obj.into_iter() {
         let tag: Tag = element.header().tag;
@@ -160,29 +198,24 @@ fn specific_tagging(path: &str, input_kind: &[String], obj: &FileDicomObject<InM
             .map(|entry| entry.alias)
             .unwrap_or("Unknown");
 
-        if input_kind.contains(&name.to_string().to_lowercase()){
+        if input_kind.contains(&name.to_string().to_lowercase()) {
             let vr = element.header().vr();
-            let value: String = element.value()
+            let value: String = element
+                .value()
                 .to_str()
                 .map(|cow| cow.into_owned())
                 .unwrap_or_else(|_| "[Binary]".to_string());
-            output.push(
-                SerializableDicomEntry { 
-                    filename: path.to_string(),
-                    name: name.to_string(),
-                    tag: format!("({:04X} {:04X})", tag.0, tag.1),
-                    vr: vr.to_string().to_string(),
-                    value: value.to_string() 
-                }
-            );
+            output.push(SerializableDicomEntry {
+                filename: path.to_string(),
+                name: name.to_string(),
+                tag: format!("({:04X} {:04X})", tag.0, tag.1),
+                vr: vr.to_string().to_string(),
+                value: value.to_string(),
+            });
             if !to_display {
-                print_colorize(tag, vr.to_string(),value.as_str(), name, out_string);
+                print_colorize(tag, vr.to_string(), value.as_str(), name, out_string);
             }
         }
     }
     return output;
 }
-
-
-
-
