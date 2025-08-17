@@ -1,7 +1,9 @@
 use serde::Serialize;
+use std::error::Error;
 use std::ffi::OsStr;
 use std::fs;
 use std::io::{self, Write};
+use std::path::PathBuf;
 
 pub use rayon;
 pub use rayon::prelude::*;
@@ -18,8 +20,12 @@ pub use std::time::{SystemTime, UNIX_EPOCH};
 
 use walkdir::{self, DirEntry, WalkDir};
 
-pub fn list_all_files(user_path: &str) -> Vec<String> {
+pub fn list_all_files(user_path: &str) -> Result<Vec<String>, Box<dyn Error>> {
     // TODO: Change to a Result and check if folder/file exists
+    if !PathBuf::from(user_path).exists() {
+        return Err("Provided file/folder doesn't exist".into());
+    }
+
     let mut res: Vec<String> = Vec::new();
 
     for entry in WalkDir::new(user_path)
@@ -35,7 +41,7 @@ pub fn list_all_files(user_path: &str) -> Vec<String> {
     {
         res.push(entry.path().to_str().unwrap().to_string());
     }
-    res
+    Ok(res)
 }
 
 #[derive(Serialize)]

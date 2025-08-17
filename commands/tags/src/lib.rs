@@ -1,7 +1,7 @@
 use pulsedcm_core::*;
 use rayon::prelude::*;
-use std::path::PathBuf;
 use std::sync::Mutex;
+use std::{error::Error, path::PathBuf};
 
 use csv::Writer;
 use pulsedcm_core::{open_file as open_dcm_file, StandardDataDictionary, Tag};
@@ -24,7 +24,13 @@ pub fn run(
     json: Option<PathBuf>,
     csv: Option<PathBuf>,
 ) {
-    let files: Vec<String> = list_all_files(path);
+    let files = match list_all_files(path) {
+        Ok(o) => o,
+        Err(e) => {
+            eprintln!("Error: {}", e);
+            return;
+        }
+    };
     let jobs: usize = jobs_handling(jobs, files.len());
 
     let export_data = Mutex::new(Vec::<SerializableDicomEntry>::new());
