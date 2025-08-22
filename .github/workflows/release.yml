@@ -46,10 +46,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: pulsedcm-${{ matrix.os }}
-          path: |
-            pulsedcm-${{ github.ref_name }}-windows-x86_64.zip
-            pulsedcm-${{ github.ref_name }}-ubuntu-latest-x86_64.tar.gz
-            pulsedcm-${{ github.ref_name }}-macos-latest-x86_64.tar.gz
+          path: pulsedcm-${{ github.ref_name }}-*
 
   create_release:
     name: Create Release and attach artifacts
