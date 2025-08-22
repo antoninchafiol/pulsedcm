@@ -27,15 +27,20 @@ jobs:
       - name: Build (release)
         run: cargo build --release
 
-      - name: Package artifact
+      - name: Package (macOS / Linux)
+        if: runner.os != 'Windows'
         run: |
-          if [ "${{ runner.os }}" = "Windows" ]; then
-            # On windows use PowerShell Compress-Archive (this run will execute in pwsh on windows runner)
-            powershell -Command "Compress-Archive -Path target\\release\\pulsedcm.exe -DestinationPath pulsedcm-${{ github.ref_name }}-windows-x86_64.zip"
-          else
-            # macOS / Linux: tar.gz
-            tar -C target/release -czf pulsedcm-${{ github.ref_name }}-${{ runner.os | toLower }}-x86_64.tar.gz pulsedcm
-          fi
+          TAG=${{ github.ref_name }}
+          OSNAME="${{ runner.os }}"
+          os_lower=$(echo "$OSNAME" | tr '[:upper:]' '[:lower:]')
+          tar -C target/release -czf pulsedcm-${TAG}-${os_lower}-x86_64.tar.gz pulsedcm
+
+      - name: Package (Windows)
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: |
+          $tag = '${{ github.ref_name }}'
+          Compress-Archive -Path target\release\pulsedcm.exe -DestinationPath "pulsedcm-$tag-windows-x86_64.zip"
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
