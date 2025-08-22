@@ -33,14 +33,14 @@ jobs:
           TAG=${{ github.ref_name }}
           OSNAME="${{ runner.os }}"
           os_lower=$(echo "$OSNAME" | tr '[:upper:]' '[:lower:]')
-          tar -C target/release -czf pulsedcm-${TAG}-${os_lower}-x86_64.tar.gz pulsedcm
+          tar -C target/release -czf pulsedcm-${TAG}-${os_lower}-x86_64.tar.gz pulsedcm-cli
 
       - name: Package (Windows)
         if: runner.os == 'Windows'
         shell: powershell
         run: |
           $tag = '${{ github.ref_name }}'
-          Compress-Archive -Path target\release\pulsedcm.exe -DestinationPath "pulsedcm-$tag-windows-x86_64.zip"
+          Compress-Archive -Path target\release\pulsedcm-cli.exe -DestinationPath "pulsedcm-$tag-windows-x86_64.zip"
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
