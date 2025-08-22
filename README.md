@@ -12,6 +12,25 @@ It focuses on being:
 I plan to build this to be accelerating workflows whether it be machine learning or research toolchain and avoid bottlenecking on DICOM parts/exchanges.
 
 
+## Install 
+### Quick & Easy
+
+Download the latest binary from the [Releases page](https://github.com/antoninchafiol/pulsedcm/releases).
+Extract from the zip archive and you can now use the binary as 
+```./pulsedcm-cli --help```
+
+### All-around way
+To install, make sure you have git and rust installed on your machine (https://www.rust-lang.org/tools/install).
+When done, proceed with the following:
+`git clone https://github.com/antoninchafiol/pulsedcm .`
+
+To compile and build as is:
+`cargo build --release`
+You'll then find the binary at `pulsedcm/target/release/pulsedcm-cli`
+
+
+
+
 <details> 
 <summary> <h2> Usage </h2> </summary>
 
@@ -142,28 +161,28 @@ pulsedcm <PATH> ano [OPTIONS]
 
 ## Base of CLI (Goals for v0.1)
 - [x] tags:
-    - [x] all  : Dumps all tags
-    - [x] "tag": for a single tag
-    - [x] short:  a curated list of “high-value” tags (PatientID, etc...)
+- [x] all  : Dumps all tags
+- [x] "tag": for a single tag
+- [x] short:  a curated list of “high-value” tags (PatientID, etc...)
 - [x] view: Display the image (ASCII/Invoke OS' Viewer)
 - [x] anonymize: Remove PHI
 
 
 ## Intermediate (Goals for v0.2)
-- [x]: Feature-Gated Modules: creating crates modules to add for a personalized executable.
-- [ ]: Optimize: tags
-- [ ]: Optimize: view
-- [ ]: Optimize: ano
+- [x] : Feature-Gated Modules: creating crates modules to add for a personalized executable.
+- [x] : Optimize: tags
+- [x] : Optimize: view (Doesn't need for v0.2)
+- [x] : Optimize: ano  (Doesn't need for v0.2)
 
 ## Advanced (Goals for v0.3)
-#### CLI
-- [ ] PACS Interop:
-    - [ ] send: Send to a server
-    - [ ] recv: Declare a server 
+- [ ] : codecs integration (JPEG 2000 Lossless)
+- [ ] : API development
 
 ## Extensions & Polish
-- [ ] Implement DICOMWeb
+- [ ] : PACS Integration
+- [ ] : Implement DICOMWeb
 </details>
+
 
 
 
