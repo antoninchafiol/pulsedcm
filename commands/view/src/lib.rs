@@ -7,6 +7,8 @@ use std::process::Command;
 
 use tempfile::TempDir;
 
+use jp2k;
+
 pub fn run(path: &str, open: u8, temp: bool, jobs: Option<usize>) {
     let mut open: u8 = open;
     let is_temp: bool = temp;
@@ -83,11 +85,48 @@ fn view_processing(
     output_path: &PathBuf,
     is_to_open: bool,
 ) -> Result<(), Box<dyn Error>> {
+    println!("jp2k");
     let dinput_path = input_path.to_str().ok_or("Can't open the path")?;
-    let obj = open_file(dinput_path)?;
-    let image = obj.decode_pixel_data()?;
-    let dynamic_image = image.to_dynamic_image(0)?;
-    dynamic_image.save(&output_path)?;
+    // Takes obj
+    let obj = open_file(path)?;
+    let ts = obj.meta().transfer_syntax();
+    // j2pk
+    if ts == "1.2.840.10008.1.2.4.90" {
+        let pixel_data = obj.element_by_name("PixelData").unwrap();
+        let buff: Result<Vec<u8>, &str> = match pixel_data.value() {
+            DicomValue::Primitive(p) => Ok(p.to_bytes().into_owned().to_vec()),
+            DicomValue::PixelSequence(seq) => {
+                let offset: Vec<u8> = seq.offset_table()
+                    .iter()
+                    .map(
+                        |&v| 
+                        v.to_ne_bytes()
+                    )
+                    .flatten()
+                    .collect();
+
+                let fragments = seq.fragments().concat();
+
+                Ok(vec![offset, fragments].concat())
+            },
+            _ => Err("The output from jp2k isn't supported")
+        };
+    // Build the image from buffer 
+    let jp2k::Image(img) = jp2k::Image::from_bytes(
+        buff, 
+        jp2k::Codec::JP2,
+        Some(jp2k::DecodeParams::default().with_decoding_area(0, 0, 256, 256))
+    )
+    .unwrap();
+
+    }
+    // Non jp2k
+    else {
+        let image = obj.decode_pixel_data()?;
+        let dynamic_image = image.to_dynamic_image(0)?;
+        dynamic_image.save(&output_path)?;
+        println!("Non jp2k");
+    }
     if is_to_open {
         open_image(output_path.to_str().unwrap());
     }
@@ -114,12 +153,13 @@ fn open_image(path: &str) {
 }
 
 fn handling_pixel_data(path: &str){
+    let dinput_path = input_path.to_str().ok_or("Can't open the path")?;
     // Takes obj
-    let obj = open_file(path).unwrap();
+    let obj = open_file(path)?;
     let ts = obj.meta().transfer_syntax();
-    let pixel_data = obj.element_by_name("PixelData").unwrap();
     // j2pk
     if ts == "1.2.840.10008.1.2.4.90" {
+        let pixel_data = obj.element_by_name("PixelData").unwrap();
         let buff: Result<Vec<u8>, &str> = match pixel_data.value() {
             DicomValue::Primitive(p) => Ok(p.to_bytes().into_owned().to_vec()),
             DicomValue::PixelSequence(seq) => {
@@ -138,11 +178,24 @@ fn handling_pixel_data(path: &str){
             },
             _ => Err("The output from jp2k isn't supported")
         };
-
+    // Build the image from buffer 
+    let jp2k::Image(img) = jp2k::Image::from_bytes(
+        buff, 
+        jp2k::Codec::JP2,
+        Some(jp2k::DecodeParams::default().with_decoding_area(0, 0, 256, 256))
+    )
+    .unwrap();
+    println!("jp2k");
 
     }
     // Non jp2k
     else {
-
+        let image = obj.decode_pixel_data()?;
+        let dynamic_image = image.to_dynamic_image(0)?;
+        dynamic_image.save(&output_path)?;
+        println!("Non jp2k");
+    }
+    if is_to_open {
+        open_image(output_path.to_str().unwrap());
     }
 }
