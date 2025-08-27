@@ -112,3 +112,37 @@ fn open_image(path: &str) {
         eprintln!("Failed to open image: {}", e);
     }
 }
+
+fn handling_pixel_data(path: &str){
+    // Takes obj
+    let obj = open_file(path).unwrap();
+    let ts = obj.meta().transfer_syntax();
+    let pixel_data = obj.element_by_name("PixelData").unwrap();
+    // j2pk
+    if ts == "1.2.840.10008.1.2.4.90" {
+        let buff: Result<Vec<u8>, &str> = match pixel_data.value() {
+            DicomValue::Primitive(p) => Ok(p.to_bytes().into_owned().to_vec()),
+            DicomValue::PixelSequence(seq) => {
+                let offset: Vec<u8> = seq.offset_table()
+                    .iter()
+                    .map(
+                        |&v| 
+                        v.to_ne_bytes()
+                    )
+                    .flatten()
+                    .collect();
+
+                let fragments = seq.fragments().concat();
+
+                Ok(vec![offset, fragments].concat())
+            },
+            _ => Err("The output from jp2k isn't supported")
+        };
+
+
+    }
+    // Non jp2k
+    else {
+
+    }
+}

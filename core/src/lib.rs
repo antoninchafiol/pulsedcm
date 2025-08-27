@@ -8,7 +8,7 @@ use std::path::PathBuf;
 pub use rayon;
 pub use rayon::prelude::*;
 
-pub use dicom_core::{DataDictionary, PrimitiveValue};
+pub use dicom_core::{DataDictionary, PrimitiveValue, DicomValue};
 pub use dicom_dictionary_std;
 pub use dicom_dictionary_std::StandardDataDictionary;
 pub use dicom_object::{open_file, FileDicomObject, InMemDicomObject, OpenFileOptions, Tag};
@@ -18,10 +18,9 @@ pub use std::fs::File;
 pub use std::path::Path;
 pub use std::time::{SystemTime, UNIX_EPOCH};
 
-use walkdir::{self, DirEntry, WalkDir};
+use walkdir::{self,  WalkDir};
 
 pub fn list_all_files(user_path: &str) -> Result<Vec<String>, Box<dyn Error>> {
-    // TODO: Change to a Result and check if folder/file exists
     if !PathBuf::from(user_path).exists() {
         return Err("Provided file/folder doesn't exist".into());
     }
@@ -86,7 +85,7 @@ pub fn print_colorize(tag: Tag, vr: &str, value: &str, name: &str, out_string: &
         "\x1b[1;93m" // Yellow/Orange
     } else if value == "[Binary]" || name == "Unknown" {
         "\x1b[90m" // Grey
-    } else {
+  } else {
         "\x1b[1m" // Bold default
     };
     let greyed = if value == "[Binary]" || name == "Unknown" {
@@ -159,3 +158,5 @@ fn is_warning_tag(tag: Tag) -> bool {
         | Tag(0x0018, 0x1030) // Protocol Name
     )
 }
+
+
