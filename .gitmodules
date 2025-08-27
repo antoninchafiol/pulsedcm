@@ -1,0 +1,3 @@
+[submodule "jp2k"]
+	path = jp2k
+	url = https://github.com/kardeiz/jp2k.git
