@@ -1,4 +1,5 @@
 use clap::Args;
+use std::path::PathBuf;
 
 use pulsedcm_commands_view::{run as view_run};
 
@@ -14,6 +15,12 @@ pub struct ViewArgs {
     #[arg(long)]
     temp: bool,
     
+    /// Output directory to save created png.
+    /// If omitted, input files will be saved in same directory as input.
+    /// Must be a directory if specified.
+    #[arg(long)]
+    out: Option<PathBuf>,
+
     /// Number of threads to launch to process
     #[arg(long, value_name="NUMBER")]
     jobs: Option<usize>,
@@ -25,6 +32,10 @@ pub fn run(path: &str, args: ViewArgs){
         path, 
         args.open.unwrap_or(0), 
         args.temp, 
+        args.out.unwrap_or_else(|| {
+            println!("Out argument not provided, taking the path of input"); 
+            PathBuf::from(&path)
+        }),
         args.jobs.clone()
     );
 }

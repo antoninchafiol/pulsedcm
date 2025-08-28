@@ -10,7 +10,13 @@ use tempfile::TempDir;
 use jp2k::{Codec, DecodeParams, ImageBuffer, Stream};
 use image;
 
-pub fn run(path: &str, open: u8, temp: bool, jobs: Option<usize>) {
+pub fn run(
+    path: &str, 
+    open: u8, 
+    temp: bool,
+    out: PathBuf,
+    jobs: Option<usize>
+) {
     let mut open: u8 = open;
     let is_temp: bool = temp;
 
@@ -41,14 +47,16 @@ pub fn run(path: &str, open: u8, temp: bool, jobs: Option<usize>) {
                         println!("{}", file);
 
                         let mut input_path = PathBuf::from(file);
-                        let mut output_path =
-                            path.join(input_path.file_name().unwrap_or_else(|| {
-                                println!("no filename in {}", input_path.display());
-                                std::ffi::OsStr::new("unknown.png")
-                            }));
-                        output_path.set_extension("png");
+                        let mut out_clone = out.clone();
 
-                        view_processing(&mut input_path, &output_path, idx < open as usize)
+                        // let mut output_path =
+                        //     path.join(input_path.file_name().unwrap_or_else(|| {
+                        //         println!("no filename in {}", input_path.display());
+                        //         std::ffi::OsStr::new("unknown.png")
+                        //     }));
+                        // output_path.set_extension("png");
+
+                        view_processing(&mut input_path, &mut out_clone, idx < open as usize)
                             .unwrap_or_else(|_e| {
                                 eprintln!("Can't process {} : {}", input_path.display(), _e);
                             });
@@ -65,13 +73,11 @@ pub fn run(path: &str, open: u8, temp: bool, jobs: Option<usize>) {
     } else {
         thread_pool.install(|| {
             files.par_iter().enumerate().for_each(|(idx, file)| {
-                println!("{}", file);
 
                 let mut input_path = PathBuf::from(file);
-                let mut output_path = input_path.clone();
-                output_path.set_extension("png");
+                let mut output_path = out.clone();
 
-                view_processing(&mut input_path, &output_path, idx < open as usize).unwrap_or_else(
+                view_processing(&mut input_path, &mut output_path, idx < open as usize).unwrap_or_else(
                     |_e| {
                         eprintln!("Can't process {} : {}", input_path.display(), _e);
                     },
@@ -83,11 +89,31 @@ pub fn run(path: &str, open: u8, temp: bool, jobs: Option<usize>) {
 
 fn view_processing(
     input_path: &mut PathBuf,
-    output_path: &PathBuf,
+    output_path: &mut PathBuf,
     is_to_open: bool,
 ) -> Result<(), Box<dyn Error>> {
     let dinput_path = input_path.to_str().ok_or("Can't open the path")?;
     let obj = open_file(dinput_path)?;
+
+    // handling output_path
+    println!("{} - {}", input_path.display(), output_path.display());
+    if input_path == output_path {
+        let filename = input_path.file_name().unwrap();
+        output_path.to_owned().push(filename);
+        output_path.set_extension("png");
+    } else { 
+        if !output_path.is_dir() {
+            eprintln!("Output path shouldn't be a file");
+        }
+        let filename = input_path.file_name().unwrap();
+        output_path.push(filename);
+        // output_path.set_file_name(filename);
+        output_path.set_extension("png");
+    }
+    println!("{}", output_path.display());
+
+
+
     let ts = obj.meta().transfer_syntax();
     if ts == "1.2.840.10008.1.2.4.90" || ts == "1.2.840.10008.1.2.4.91"{
         let buff: Vec<u8> = build_byte_buffer(obj)?;
@@ -141,13 +167,13 @@ fn handle_byte_to_jp2k(buff: Vec<u8>, output_path: &str) -> Result<(), Box<dyn s
     let img_buf = ImageBuffer::build(codec, stream, DecodeParams::default())?;
     let dyn_img = match img_buf.num_bands {
         1 => image::DynamicImage::ImageLuma8(
-            image::GrayImage::from_raw(img_buf.width, img_buf.height, img_buf.buffer)?,
+            image::GrayImage::from_raw(img_buf.width, img_buf.height, img_buf.buffer).unwrap(),
         ),
         3 => image::DynamicImage::ImageRgb8(
-            image::RgbImage::from_raw(img_buf.width, img_buf.height, img_buf.buffer)?,
+            image::RgbImage::from_raw(img_buf.width, img_buf.height, img_buf.buffer).unwrap(),
         ),
         4 => image::DynamicImage::ImageRgba8(
-            image::RgbaImage::from_raw(img_buf.width, img_buf.height, img_buf.buffer)?,
+            image::RgbaImage::from_raw(img_buf.width, img_buf.height, img_buf.buffer).unwrap(),
         ),
         _ => return Err("Unsupported number of components".into()),
     };
