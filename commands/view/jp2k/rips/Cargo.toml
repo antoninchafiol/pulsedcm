@@ -1,0 +1,24 @@
+[package]
+name = "rips"
+version = "0.3.0"
+authors = ["Jacob Brown <kardeiz@gmail.com>"]
+edition = "2018"
+license = "MIT OR Apache-2.0"
+categories = ["multimedia::images"]
+description = "Rust bindings for libvips"
+keywords = ["vips", "libvips"]
+readme = "README.md"
+repository = "https://github.com/kardeiz/rips"
+
+[dependencies]
+libc = "0.2.62"
+
+[build-dependencies]
+pkg-config = "0.3.16"
+bindgen = "0.69"
+
+[features]
+docs-rs = []
+
+[package.metadata.docs.rs]
+features = ["docs-rs"]

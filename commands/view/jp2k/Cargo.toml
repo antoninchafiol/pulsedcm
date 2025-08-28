@@ -1,0 +1,31 @@
+[package]
+name = "jp2k"
+version = "0.3.1"
+authors = ["Jacob Brown <kardeiz@gmail.com>", "Leo Schwarz <mail@leoschwarz.com>"]
+license = "MIT OR Apache-2.0"
+edition = "2018"
+categories = ["multimedia::images"]
+description = "Interface to load JPEG200 images into image"
+keywords = ["jpeg2000", "jp2", "jp2k", "openjpeg"]
+readme = "README.md"
+repository = "https://github.com/kardeiz/jp2k"
+
+[dependencies]
+libc = "0.2"
+
+[build-dependencies]
+bindgen = "0.69"
+pkg-config = "0.3.16"
+
+
+[dev-dependencies]
+rips = { path = "rips" }
+stopwatch = "0.0.7"
+env_logger = "0.7.0"
+
+
+[features]
+docs-rs = []
+
+[package.metadata.docs.rs]
+features = ["docs-rs"]

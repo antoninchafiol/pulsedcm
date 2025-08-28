@@ -7,7 +7,8 @@ use std::process::Command;
 
 use tempfile::TempDir;
 
-use jp2k;
+use jp2k::{Codec, DecodeParams, ImageBuffer, Stream};
+use image;
 
 pub fn run(path: &str, open: u8, temp: bool, jobs: Option<usize>) {
     let mut open: u8 = open;
@@ -85,47 +86,17 @@ fn view_processing(
     output_path: &PathBuf,
     is_to_open: bool,
 ) -> Result<(), Box<dyn Error>> {
-    println!("jp2k");
     let dinput_path = input_path.to_str().ok_or("Can't open the path")?;
-    // Takes obj
-    let obj = open_file(path)?;
+    let obj = open_file(dinput_path)?;
     let ts = obj.meta().transfer_syntax();
-    // j2pk
-    if ts == "1.2.840.10008.1.2.4.90" {
-        let pixel_data = obj.element_by_name("PixelData").unwrap();
-        let buff: Result<Vec<u8>, &str> = match pixel_data.value() {
-            DicomValue::Primitive(p) => Ok(p.to_bytes().into_owned().to_vec()),
-            DicomValue::PixelSequence(seq) => {
-                let offset: Vec<u8> = seq.offset_table()
-                    .iter()
-                    .map(
-                        |&v| 
-                        v.to_ne_bytes()
-                    )
-                    .flatten()
-                    .collect();
+    if ts == "1.2.840.10008.1.2.4.90" || ts == "1.2.840.10008.1.2.4.91"{
+        let buff: Vec<u8> = build_byte_buffer(obj)?;
+        handle_byte_to_jp2k(buff, output_path.to_str().unwrap())?;
 
-                let fragments = seq.fragments().concat();
-
-                Ok(vec![offset, fragments].concat())
-            },
-            _ => Err("The output from jp2k isn't supported")
-        };
-    // Build the image from buffer 
-    let jp2k::Image(img) = jp2k::Image::from_bytes(
-        buff, 
-        jp2k::Codec::JP2,
-        Some(jp2k::DecodeParams::default().with_decoding_area(0, 0, 256, 256))
-    )
-    .unwrap();
-
-    }
-    // Non jp2k
-    else {
+    } else {
         let image = obj.decode_pixel_data()?;
         let dynamic_image = image.to_dynamic_image(0)?;
         dynamic_image.save(&output_path)?;
-        println!("Non jp2k");
     }
     if is_to_open {
         open_image(output_path.to_str().unwrap());
@@ -152,50 +123,35 @@ fn open_image(path: &str) {
     }
 }
 
-fn handling_pixel_data(path: &str){
-    let dinput_path = input_path.to_str().ok_or("Can't open the path")?;
-    // Takes obj
-    let obj = open_file(path)?;
-    let ts = obj.meta().transfer_syntax();
-    // j2pk
-    if ts == "1.2.840.10008.1.2.4.90" {
+
+fn build_byte_buffer(obj: FileDicomObject<InMemDicomObject>) -> Result<Vec<u8>, &'static str>  {
         let pixel_data = obj.element_by_name("PixelData").unwrap();
         let buff: Result<Vec<u8>, &str> = match pixel_data.value() {
             DicomValue::Primitive(p) => Ok(p.to_bytes().into_owned().to_vec()),
-            DicomValue::PixelSequence(seq) => {
-                let offset: Vec<u8> = seq.offset_table()
-                    .iter()
-                    .map(
-                        |&v| 
-                        v.to_ne_bytes()
-                    )
-                    .flatten()
-                    .collect();
-
-                let fragments = seq.fragments().concat();
-
-                Ok(vec![offset, fragments].concat())
-            },
+            DicomValue::PixelSequence(seq) => Ok(seq.fragments().concat()),
             _ => Err("The output from jp2k isn't supported")
         };
-    // Build the image from buffer 
-    let jp2k::Image(img) = jp2k::Image::from_bytes(
-        buff, 
-        jp2k::Codec::JP2,
-        Some(jp2k::DecodeParams::default().with_decoding_area(0, 0, 256, 256))
-    )
-    .unwrap();
-    println!("jp2k");
+        buff
+}
 
-    }
-    // Non jp2k
-    else {
-        let image = obj.decode_pixel_data()?;
-        let dynamic_image = image.to_dynamic_image(0)?;
-        dynamic_image.save(&output_path)?;
-        println!("Non jp2k");
-    }
-    if is_to_open {
-        open_image(output_path.to_str().unwrap());
-    }
+fn handle_byte_to_jp2k(buff: Vec<u8>, output_path: &str) -> Result<(), Box<dyn std::error::Error>>{
+    let stream = Stream::from_bytes(&buff)?;
+    let codec = Codec::create(jp2k::CODEC_FORMAT::OPJ_CODEC_J2K)?;
+
+    let img_buf = ImageBuffer::build(codec, stream, DecodeParams::default())?;
+    let dyn_img = match img_buf.num_bands {
+        1 => image::DynamicImage::ImageLuma8(
+            image::GrayImage::from_raw(img_buf.width, img_buf.height, img_buf.buffer)?,
+        ),
+        3 => image::DynamicImage::ImageRgb8(
+            image::RgbImage::from_raw(img_buf.width, img_buf.height, img_buf.buffer)?,
+        ),
+        4 => image::DynamicImage::ImageRgba8(
+            image::RgbaImage::from_raw(img_buf.width, img_buf.height, img_buf.buffer)?,
+        ),
+        _ => return Err("Unsupported number of components".into()),
+    };
+
+    dyn_img.save(output_path)?;
+    Ok(())
 }

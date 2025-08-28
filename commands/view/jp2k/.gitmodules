@@ -1,0 +1,3 @@
+[submodule "rips"]
+	path = rips
+	url = https://github.com/kardeiz/rips.git
