@@ -1,5 +1,4 @@
 use pulsedcm_core::*;
-use rayon::prelude::*;
 use std::path::PathBuf;
 
 use std::error::Error;
@@ -36,8 +35,7 @@ pub fn run(
 
     if is_temp {
         match TempDir::new() {
-            Ok(dir) => {
-                let path = dir.path().to_path_buf();
+            Ok(_) => {
                 if open <= 0 {
                     open = 1;
                 }

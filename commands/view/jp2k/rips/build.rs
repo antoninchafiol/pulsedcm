@@ -38,7 +38,6 @@ fn main() {
         .default_enum_style(bindgen::EnumVariation::Rust { non_exhaustive: false })
         .header_contents("wrapper.h", "#include \"vips/vips.h\"")
         .parse_callbacks(Box::new(ignored_macros))
-        .rustfmt_bindings(true)
         .generate()
         .unwrap();
 

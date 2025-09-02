@@ -339,6 +339,7 @@ impl Image {
     }
 }
 
+#[allow(dead_code)]
 pub struct Component(*mut ffi::opj_image_comp_t);
 
 #[derive(Debug)]

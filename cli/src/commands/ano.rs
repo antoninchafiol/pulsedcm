@@ -53,7 +53,7 @@ fn parse_actions(input: &str) -> Result<Actions, String>{
         "replace" => Ok(Actions::Replace),
         "remove"  => Ok(Actions::Remove),
         "zero"    => Ok(Actions::Zero),
-        other => {
+        _other => {
             Err("should be either: 'replace', 'remove' or 'zero'".to_string())
         }
     }
@@ -64,7 +64,7 @@ fn parse_policy(input: &str) -> Result<Policy, String>{
         "basic"    => Ok(Policy::Basic) ,
         "moderate" => Ok(Policy::Moderate) ,
         "strict"   => Ok(Policy::Strict) ,
-        other => {
+        _other => {
             Err("should be either: 'basic', 'moderate' or 'strict'".to_string())
         }
     }

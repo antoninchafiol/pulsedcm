@@ -26,7 +26,6 @@ fn main() {
         .derive_debug(true)
         .impl_debug(true)
         .default_enum_style(bindgen::EnumVariation::Rust { non_exhaustive: false })
-        .rustfmt_bindings(true)
         .generate()
         .unwrap();
 

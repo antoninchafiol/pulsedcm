@@ -1,6 +1,5 @@
 use serde::Serialize;
 use std::error::Error;
-// use std::fmt::Result;
 use std::io::{self, Write};
 use std::path::PathBuf;
 
@@ -160,8 +159,6 @@ fn is_warning_tag(tag: Tag) -> bool {
 
 pub fn output_handling(input_path: &PathBuf, output_path: &mut PathBuf) -> Result<(), Box<dyn std::error::Error>>{
     // Check if output_path exists (and create a folder if not )
-    
-    println!("{} - {}", input_path.display(), output_path.display());
     if !output_path.exists() {
         if ask_yes_no("Output folder doesn't exist, would you like to create it?") {
             create_dir(output_path.as_path()).unwrap();
@@ -181,7 +178,6 @@ pub fn output_handling(input_path: &PathBuf, output_path: &mut PathBuf) -> Resul
         output_path.push(filename);
         output_path.set_extension("png");
     }
-    println!("{} - {}", input_path.display(), output_path.display());
     Ok(())
 }
 
