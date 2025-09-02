@@ -49,12 +49,6 @@ pub fn run(
                         let mut input_path = PathBuf::from(file);
                         let mut out_clone = out.clone();
 
-                        // let mut output_path =
-                        //     path.join(input_path.file_name().unwrap_or_else(|| {
-                        //         println!("no filename in {}", input_path.display());
-                        //         std::ffi::OsStr::new("unknown.png")
-                        //     }));
-                        // output_path.set_extension("png");
 
                         view_processing(&mut input_path, &mut out_clone, idx < open as usize)
                             .unwrap_or_else(|_e| {
@@ -95,24 +89,7 @@ fn view_processing(
     let dinput_path = input_path.to_str().ok_or("Can't open the path")?;
     let obj = open_file(dinput_path)?;
 
-    // handling output_path
-    println!("{} - {}", input_path.display(), output_path.display());
-    if input_path == output_path {
-        let filename = input_path.file_name().unwrap();
-        output_path.to_owned().push(filename);
-        output_path.set_extension("png");
-    } else { 
-        if !output_path.is_dir() {
-            eprintln!("Output path shouldn't be a file");
-        }
-        let filename = input_path.file_name().unwrap();
-        output_path.push(filename);
-        // output_path.set_file_name(filename);
-        output_path.set_extension("png");
-    }
-    println!("{}", output_path.display());
-
-
+    output_handling(input_path, output_path)?;
 
     let ts = obj.meta().transfer_syntax();
     if ts == "1.2.840.10008.1.2.4.90" || ts == "1.2.840.10008.1.2.4.91"{

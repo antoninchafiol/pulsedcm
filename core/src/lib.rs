@@ -1,7 +1,6 @@
 use serde::Serialize;
 use std::error::Error;
-use std::ffi::OsStr;
-use std::fs;
+// use std::fmt::Result;
 use std::io::{self, Write};
 use std::path::PathBuf;
 
@@ -14,7 +13,7 @@ pub use dicom_dictionary_std::StandardDataDictionary;
 pub use dicom_object::{open_file, FileDicomObject, InMemDicomObject, OpenFileOptions, Tag};
 pub use dicom_pixeldata::PixelDecoder;
 
-pub use std::fs::File;
+pub use std::fs::{File, create_dir};
 pub use std::path::Path;
 pub use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -159,4 +158,30 @@ fn is_warning_tag(tag: Tag) -> bool {
     )
 }
 
+pub fn output_handling(input_path: &PathBuf, output_path: &mut PathBuf) -> Result<(), Box<dyn std::error::Error>>{
+    // Check if output_path exists (and create a folder if not )
+    
+    println!("{} - {}", input_path.display(), output_path.display());
+    if !output_path.exists() {
+        if ask_yes_no("Output folder doesn't exist, would you like to create it?") {
+            create_dir(output_path.as_path()).unwrap();
+        } else {
+            return Err("Output folder not created, hence terminate".into());
+        }
+    } 
+    if input_path == output_path {
+        let filename = input_path.file_name().unwrap();
+        output_path.to_owned().push(filename);
+        output_path.set_extension("png");
+    } else { 
+        if !output_path.is_dir() {
+            eprintln!("Output path shouldn't be a file");
+        }
+        let filename = input_path.file_name().unwrap();
+        output_path.push(filename);
+        output_path.set_extension("png");
+    }
+    println!("{} - {}", input_path.display(), output_path.display());
+    Ok(())
+}
 
