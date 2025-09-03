@@ -188,6 +188,9 @@ fn ano_threaded_function(
         }
         let filename = Path::new(file).file_name().unwrap();
         out.push(filename);
+
+
+
         let data = ano_file_process(PathBuf::from(file), &action, &policy, verbose);
         match data.write_to_file(&out) {
             Ok(_o) => {

@@ -1455,6 +1455,7 @@ dependencies = [
  "dicom-dictionary-std",
  "dicom-object",
  "dicom-pixeldata",
+ "jp2k",
  "rayon",
  "serde",
  "walkdir",

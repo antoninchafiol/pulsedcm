@@ -18,6 +18,10 @@ pub use std::time::{SystemTime, UNIX_EPOCH};
 
 use walkdir::{self,  WalkDir};
 
+mod errors;
+
+
+
 pub fn list_all_files(user_path: &str) -> Result<Vec<String>, Box<dyn Error>> {
     if !PathBuf::from(user_path).exists() {
         return Err("Provided file/folder doesn't exist".into());

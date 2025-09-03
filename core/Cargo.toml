@@ -12,4 +12,5 @@ dicom-pixeldata = { version = "0.8.1", features=['image']}
 serde = { version = "1", features = ["derive"] }
 rayon = "1.10.0"
 walkdir = "2.5.0"
+jp2k = {path = "../commands/view/jp2k"}
 
