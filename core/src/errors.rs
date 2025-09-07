@@ -11,7 +11,7 @@ pub enum DicomError {
 impl Display for DicomError {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Read(_) => f.write_str("Read error"),
+            Self::Read(e) => write!(f, "Read: {}", e ),
         }
     }
 }
@@ -32,9 +32,12 @@ impl Error for DicomError {
 #[derive(Debug)]
 pub enum PulseErrorKind {
     IO(std::io::Error),
+    SystemTime(std::time::SystemTimeError),
     Dicom(DicomError),
     Threading(rayon::ThreadPoolBuildError),
+    ThreadPoison(String),
     CodecError(jp2k::err::Error),
+    CSV(csv::Error),
 
 }
 
@@ -44,8 +47,11 @@ impl Display for PulseErrorKind {
         match self {
             Self::IO(e) => write!(f, "I/O Error: {}", e),
             Self::Dicom(e) => write!(f, "Dicom Error: {}", e),
+            Self::SystemTime(e) => write!(f, "System Time error: {}", e), 
             Self::Threading(e) => write!(f, "Threading Error: {}", e),
+            Self::ThreadPoison(_) =>  write!(f, "Thread Poisoned"),
             Self::CodecError(e) => write!(f, "Codec Error: {}", e),
+            Self::CSV(e) => write!(f, "CSV Error: {}", e), 
         }
     }
 }
@@ -53,10 +59,13 @@ impl Display for PulseErrorKind {
 impl Error for PulseErrorKind {
     fn source(&self) -> Option<&(dyn Error + 'static)> { 
         match self { 
-            Self::IO(source) => Some(source),
-            Self::Dicom(source) => Some(source),
-            Self::Threading(source) => Some(source),
-            Self::CodecError(source) => Some(source),
+            Self::IO(s) => Some(s),
+            Self::Dicom(s) => Some(s),
+            Self::SystemTime(s) => Some(s),
+            Self::Threading(s) => Some(s),
+            Self::ThreadPoison(_) => None,
+            Self::CodecError(s) => Some(s),
+            Self::CSV(s) => Some(s),
         }
     }
 }
@@ -92,4 +101,75 @@ impl Error for PulseError {
     }
 }
 // ======== END ERROR STRUCT ==========
+impl From<std::io::Error> for PulseError {
+    fn from(e: std::io::Error) -> Self {
+        PulseError::new(PulseErrorKind::IO(e), "I/O error")
+    }
+}
+
+impl From<rayon::ThreadPoolBuildError> for PulseError {
+    fn from(e: rayon::ThreadPoolBuildError) -> Self {
+        Self { 
+            kind: PulseErrorKind::Threading(e), 
+            message: "Thread pool error".to_string(), 
+        }
+    }
+}
+
+impl From<dicom_object::ReadError> for PulseError {
+    fn from(e: dicom_object::ReadError) -> Self {
+        PulseError::new(PulseErrorKind::Dicom(DicomError::Read(e)), "DICOM error")
+    }
+}
+
+impl<T> From<std::sync::PoisonError<std::sync::MutexGuard<'_, T>>> for PulseError {
+    fn from(err: std::sync::PoisonError<std::sync::MutexGuard<'_, T>>) -> Self {
+        PulseError::new(PulseErrorKind::ThreadPoison(err.to_string()), "Mutex poisoned")
+    }
+}
+
+impl From<std::time::SystemTimeError> for PulseError {
+    fn from(e: std::time::SystemTimeError) -> Self { Self { 
+            kind: PulseErrorKind::SystemTime(e), 
+            message: "System time error".to_string(), 
+        }
+    }
+}
+
+impl From<csv::Error> for PulseError {
+    fn from(e: csv::Error) -> Self { Self { 
+            kind: PulseErrorKind::CSV(e), 
+            message: "CSV error".to_string(), 
+        }
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 

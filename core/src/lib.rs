@@ -1,5 +1,4 @@
 use serde::Serialize;
-use std::error::Error;
 use std::io::{self, Write};
 use std::path::PathBuf;
 
@@ -19,12 +18,16 @@ pub use std::time::{SystemTime, UNIX_EPOCH};
 use walkdir::{self,  WalkDir};
 
 mod errors;
+pub use errors::PulseError;
 
+pub type Result<T> = std::result::Result<T, PulseError>;
 
-
-pub fn list_all_files(user_path: &str) -> Result<Vec<String>, Box<dyn Error>> {
+pub fn list_all_files(user_path: &str) -> Result<Vec<String>> {
     if !PathBuf::from(user_path).exists() {
-        return Err("Provided file/folder doesn't exist".into());
+        return Err(errors::PulseError::new(
+                errors::PulseErrorKind::IO(
+                    io::Error::new(io::ErrorKind::NotFound, "IO Operation failed")
+                ), "Provided file/folder doesn't exist"));
     }
 
     let mut res: Vec<String> = Vec::new();
@@ -41,6 +44,32 @@ pub fn list_all_files(user_path: &str) -> Result<Vec<String>, Box<dyn Error>> {
         })
     {
         res.push(entry.path().to_str().unwrap().to_string());
+    }
+    Ok(res)
+}
+
+pub fn collect_dicom_files(user_path: &str) -> Result<Vec<PathBuf>> {
+    if !PathBuf::from(user_path).exists() {
+        return Err(errors::PulseError::new(
+                errors::PulseErrorKind::IO(
+                    io::Error::new(io::ErrorKind::NotFound, "IO Operation failed")
+                ), "Provided file/folder doesn't exist"));
+    }
+
+    let mut res: Vec<PathBuf> = Vec::new();
+
+    for entry in WalkDir::new(user_path)
+        .into_iter()
+        .filter_map(|e| e.ok())
+        .filter(|e| {
+            e.path()
+                .extension()
+                .and_then(|e| e.to_str())
+                .map(|e| e.eq_ignore_ascii_case("dcm"))
+                .unwrap_or(false)
+        })
+    {
+        res.push(entry.into_path());
     }
     Ok(res)
 }
@@ -161,13 +190,20 @@ fn is_warning_tag(tag: Tag) -> bool {
     )
 }
 
-pub fn output_handling(input_path: &PathBuf, output_path: &mut PathBuf) -> Result<(), Box<dyn std::error::Error>>{
+pub fn output_handling(input_path: &PathBuf, output_path: &mut PathBuf) -> Result<()>{
     // Check if output_path exists (and create a folder if not )
     if !output_path.exists() {
         if ask_yes_no("Output folder doesn't exist, would you like to create it?") {
             create_dir(output_path.as_path()).unwrap();
         } else {
-            return Err("Output folder not created, hence terminate".into());
+            return Err(PulseError::new(
+                errors::PulseErrorKind::IO(
+                    io::Error::new(
+                        io::ErrorKind::Other, "Output folder not created, hence terminate"
+                        )
+                    ), 
+                "I/O"
+                ));
         }
     } 
     if input_path == output_path {

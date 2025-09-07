@@ -50,12 +50,17 @@ fn parse_tag_flags(s: &str) -> Result<TagFlags, String> {
 }
 
 pub fn run(path: &str, args: TagsArgs) {
-    tag_run(
+    match tag_run(
         path,
         args.kind.clone(),
         args.with_pixel_data,
         args.jobs.clone(),
         args.json.clone(),
         args.csv.clone(),
-    );
+    ) {
+        Ok(_) => {},
+        Err(e) => {
+            eprintln!("Error when running tags command: {}", e);
+        }
+    };
 }

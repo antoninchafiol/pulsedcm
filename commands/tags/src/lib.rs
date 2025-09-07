@@ -3,7 +3,13 @@ use std::sync::Mutex;
 use std::{path::PathBuf};
 
 use csv::Writer;
-use pulsedcm_core::{open_file as open_dcm_file, StandardDataDictionary, Tag};
+use pulsedcm_core::{
+    collect_dicom_files,
+    open_file as open_dcm_file, 
+    StandardDataDictionary,
+    Tag,
+    Result,
+};
 
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
 pub enum TagFlags {
@@ -22,55 +28,47 @@ pub fn run(
     jobs: Option<usize>,
     json: Option<PathBuf>,
     csv: Option<PathBuf>,
-) {
-    let files = match list_all_files(path) {
-        Ok(o) => o,
-        Err(e) => {
-            eprintln!("Error: {}", e);
-            return;
-        }
-    };
-    let jobs: usize = jobs_handling(jobs, files.len());
-
-    let export_data = Mutex::new(Vec::<SerializableDicomEntry>::new());
+) -> Result<()> {
+    // Setting up all components
+    let files = collect_dicom_files(path)?;
+    let jobs = jobs_handling(jobs, files.len());
     let to_display = csv.is_some() || json.is_some();
 
+    let export_data = Mutex::new(Vec::<SerializableDicomEntry>::new());
     let thread_pool = rayon::ThreadPoolBuilder::new()
         .num_threads(jobs)
-        .build()
-        .unwrap();
-    thread_pool.install(|| {
-        files.par_iter().for_each(|f| {
-            let mut out_string = String::new();
-            let path: &str = f.as_str();
-            if !to_display {
-                out_string.push_str(&format!("[{}]----\n", path));
-            }
+        .build()?;
 
-            // Skipping pixel data when specified or exporting to JSON/CSV
-            let obj = if !with_pixel_data || to_display {
-                OpenFileOptions::new()
-                    .read_until(dicom_dictionary_std::tags::PIXEL_DATA)
-                    .open_file(path)
-            } else {
-                open_dcm_file(path)
-            };
-            let obj = match obj {
-                Ok(o) => o,
-                Err(e) => {
-                    out_string.push_str(&format!("Can't open file: {}\n", e));
-                    return;
+    thread_pool.install(|| {
+        files.par_iter().try_for_each(
+            |f: &PathBuf| -> Result<()> {
+                let mut out_string = String::new();
+                let path = f.as_os_str().to_str().unwrap_or("No path");
+                if !to_display {
+                    out_string.push_str(&format!("[{}]----\n", path));
                 }
-            };
-            export_data.lock().unwrap().extend(match &kind {
-                TagFlags::All => all_tagging(path, &obj, to_display, &mut out_string),
-                TagFlags::Short => short_tagging(path, &obj, to_display, &mut out_string),
-                TagFlags::Specific(keys) => {
-                    specific_tagging(path, &keys, &obj, to_display, &mut out_string)
+
+                // Skipping pixel data when specified or exporting to JSON/CSV
+                let obj = if !with_pixel_data || to_display {
+                    OpenFileOptions::new()
+                        .read_until(dicom_dictionary_std::tags::PIXEL_DATA)
+                        .open_file(path)?
+                } else {
+                    open_dcm_file(path)?
+                };
+
+                export_data.lock()?.extend(
+                    match &kind {
+                        TagFlags::All => all_tagging(path, &obj, to_display, &mut out_string),
+                        TagFlags::Short => short_tagging(path, &obj, to_display, &mut out_string),
+                        TagFlags::Specific(keys) => {
+                            specific_tagging(path, &keys, &obj, to_display, &mut out_string)
+                        }
                 }
+                );
+                println!("{}", out_string);
+                Ok(())
             });
-            println!("{}", out_string);
-        });
         if let Some(json_path) = json.clone() {
             write_tag_files("json", json_path, &export_data);
         }
@@ -79,38 +77,41 @@ pub fn run(
             write_tag_files("csv", csv_path, &export_data);
         }
     });
+    Ok(())
 }
 
 fn write_tag_files(
     extension_type: &str,
     mut arg_clone: PathBuf,
     export_data: &Mutex<Vec<SerializableDicomEntry>>,
-) {
+) -> Result<()> {
     if arg_clone.extension().is_none() {
         arg_clone.set_extension(extension_type);
     }
     if arg_clone.exists() {
         let timestamp = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
+            .duration_since(UNIX_EPOCH)?
             .as_secs();
         let stem = arg_clone.file_stem().unwrap_or_default().to_string_lossy();
         let parent = arg_clone.parent().unwrap_or_else(|| Path::new(""));
         let new_name = format!("{}_{}.{}", stem, timestamp, extension_type);
         arg_clone = parent.join(new_name);
     }
-    let file = File::create(&arg_clone).unwrap();
+    let file = File::create(&arg_clone)?;
     let mut wrt = Writer::from_writer(file);
-    for entry in export_data.lock().unwrap().iter() {
-        wrt.serialize(entry).unwrap();
+    for entry in export_data.lock()?.iter() {
+        wrt.serialize(entry)?;
     }
 
     match wrt.flush() {
-        Ok(_o) => println!(
-            "\x1b[1;32mSuccessfully\x1b[0m saved CSV as \x1b[1m{:?} \x1b[0m",
-            arg_clone
-        ),
-        Err(_e) => println!("Error when writing in file"),
+        Ok(_o) => {
+            println!(
+                "\x1b[1;32mSuccessfully\x1b[0m saved CSV as \x1b[1m{:?} \x1b[0m",
+                arg_clone
+            );
+            return Ok(());
+        },
+        Err(e) => Err(e.into()),
     }
 }
 

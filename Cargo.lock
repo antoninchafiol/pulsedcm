@@ -1451,6 +1451,7 @@ dependencies = [
 name = "pulsedcm-core"
 version = "0.2.0"
 dependencies = [
+ "csv",
  "dicom-core",
  "dicom-dictionary-std",
  "dicom-object",
