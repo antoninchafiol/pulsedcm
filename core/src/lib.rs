@@ -18,7 +18,7 @@ pub use std::time::{SystemTime, UNIX_EPOCH};
 use walkdir::{self,  WalkDir};
 
 mod errors;
-pub use errors::PulseError;
+pub use errors::{PulseError, PulseErrorKind};
 
 pub type Result<T> = std::result::Result<T, PulseError>;
 

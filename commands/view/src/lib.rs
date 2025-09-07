@@ -125,17 +125,22 @@ fn open_image(path: &str) {
 }
 
 
-fn build_byte_buffer(obj: FileDicomObject<InMemDicomObject>) -> Result<Vec<u8>, &'static str>  {
-        let pixel_data = obj.element_by_name("PixelData").unwrap();
-        let buff: Result<Vec<u8>, &str> = match pixel_data.value() {
-            DicomValue::Primitive(p) => Ok(p.to_bytes().into_owned().to_vec()),
-            DicomValue::PixelSequence(seq) => Ok(seq.fragments().concat()),
-            _ => Err("The output from jp2k isn't supported")
-        };
+fn build_byte_buffer(obj: FileDicomObject<InMemDicomObject>) -> Result<Vec<u8>>  {
+    let pixel_data = obj.element_by_name("PixelData").unwrap();
+    let buff: Result<Vec<u8>> = match pixel_data.value() {
+        DicomValue::Primitive(p) => Ok(p.to_bytes().into_owned().to_vec()),
+        DicomValue::PixelSequence(seq) => Ok(seq.fragments().concat()),
+        _ => {
+            return Err(PulseError::new(
+                    PulseErrorKind::UnsupportedPixelData, 
+                    "The output from jp2k isn't supported",
+            ));
+        },
+    };
         buff
 }
 
-fn handle_byte_to_jp2k(buff: Vec<u8>, output_path: &str) -> Result<(), Box<dyn std::error::Error>>{
+fn handle_byte_to_jp2k(buff: Vec<u8>, output_path: &str) -> Result<()> {
     let stream = Stream::from_bytes(&buff)?;
     let codec = Codec::create(jp2k::CODEC_FORMAT::OPJ_CODEC_J2K)?;
 
@@ -150,7 +155,12 @@ fn handle_byte_to_jp2k(buff: Vec<u8>, output_path: &str) -> Result<(), Box<dyn s
         4 => image::DynamicImage::ImageRgba8(
             image::RgbaImage::from_raw(img_buf.width, img_buf.height, img_buf.buffer).unwrap(),
         ),
-        _ => return Err("Unsupported number of components".into()),
+        _ => {
+            return Err(PulseError::new(
+                    PulseErrorKind::UnsupportedComponent, 
+                    "Component not supported",
+            ));
+        }
     };
 
     dyn_img.save(output_path)?;

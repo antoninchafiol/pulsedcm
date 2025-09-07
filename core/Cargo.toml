@@ -14,3 +14,5 @@ rayon = "1.10.0"
 walkdir = "2.5.0"
 jp2k = {path = "../commands/view/jp2k"}
 csv = "1.3.1"
+image = "0.25.6"
+

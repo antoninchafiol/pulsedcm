@@ -28,7 +28,7 @@ pub struct ViewArgs {
 } 
 
 pub fn run(path: &str, args: ViewArgs){
-    view_run(
+   match view_run(
         path, 
         args.open.unwrap_or(0), 
         args.temp, 
@@ -37,7 +37,12 @@ pub fn run(path: &str, args: ViewArgs){
             PathBuf::from(&path)
         }),
         args.jobs.clone()
-    );
+    ){
+        Ok(_) => {},
+        Err(e) => {
+            eprintln!("Error when running view command: {}", e);
+        }
+   };
 }
 
 

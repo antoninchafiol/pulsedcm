@@ -36,9 +36,12 @@ pub enum PulseErrorKind {
     Dicom(DicomError),
     Threading(rayon::ThreadPoolBuildError),
     ThreadPoison(String),
+    ImageError(image::ImageError),
     CodecError(jp2k::err::Error),
     CSV(csv::Error),
-
+    // Additional checks
+    UnsupportedPixelData, 
+    UnsupportedComponent,
 }
 
 
@@ -50,11 +53,13 @@ impl Display for PulseErrorKind {
             Self::SystemTime(e) => write!(f, "System Time error: {}", e), 
             Self::Threading(e) => write!(f, "Threading Error: {}", e),
             Self::ThreadPoison(_) =>  write!(f, "Thread Poisoned"),
+            Self::ImageError(e) => write!(f, "Image Error: {}", e),
             Self::CodecError(e) => write!(f, "Codec Error: {}", e),
             Self::CSV(e) => write!(f, "CSV Error: {}", e), 
+            Self::UnsupportedPixelData => write!(f, "Unsupported pixel data"),
+            Self::UnsupportedComponent => write!(f, "Unsupported number of components"),
         }
     }
-}
 
 impl Error for PulseErrorKind {
     fn source(&self) -> Option<&(dyn Error + 'static)> { 
@@ -64,6 +69,7 @@ impl Error for PulseErrorKind {
             Self::SystemTime(s) => Some(s),
             Self::Threading(s) => Some(s),
             Self::ThreadPoison(_) => None,
+            Self::ImageError(s) => Some(s),
             Self::CodecError(s) => Some(s),
             Self::CSV(s) => Some(s),
         }
@@ -144,6 +150,13 @@ impl From<csv::Error> for PulseError {
     }
 }
 
+impl From<jp2k::err::Error> for PulseError {
+    fn from(e: jp2k::err::Error) -> Self { Self { 
+            kind: PulseErrorKind::CodecError(e), 
+            message: "CSV error".to_string(), 
+        }
+    }
+}
 
 
 
