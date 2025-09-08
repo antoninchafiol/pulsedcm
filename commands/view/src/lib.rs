@@ -1,7 +1,6 @@
 use pulsedcm_core::*;
 use std::path::PathBuf;
 
-use std::error::Error;
 use std::process::Command;
 
 use tempfile::TempDir;
@@ -15,17 +14,11 @@ pub fn run(
     temp: bool,
     out: PathBuf,
     jobs: Option<usize>
-) {
+) -> Result<()> {
     let mut open: u8 = open;
     let is_temp: bool = temp;
 
-    let files = match list_all_files(path) {
-        Ok(o) => o,
-        Err(e) => {
-            eprintln!("Error: {}", e);
-            return;
-        }
-    };
+    let files = collect_dicom_files(path)?;
     let jobs: usize = jobs_handling(jobs, files.len());
 
     let thread_pool = rayon::ThreadPoolBuilder::new()
@@ -35,29 +28,29 @@ pub fn run(
 
     if is_temp {
         match TempDir::new() {
-            Ok(_) => {
-                if open <= 0 {
-                    open = 1;
-                }
+            Ok(tmp_dir) => {
+                if open <= 0 { open = 1; }
+                let tmp_path = tmp_dir.into_path();
 
-                thread_pool.install(|| {
-                    files.par_iter().enumerate().for_each(|(idx, file)| {
-                        println!("{}", file);
+                let _ = thread_pool.install(|| -> Result<()> {
+                    let _ = files.par_iter().enumerate().try_for_each(|(idx, file)| -> Result<()> {
+                        println!("{}", file.as_os_str().to_str().unwrap_or_default());
 
                         let mut input_path = PathBuf::from(file);
-                        let mut out_clone = out.clone();
+                        let mut out_clone = tmp_path.clone();
 
 
                         view_processing(&mut input_path, &mut out_clone, idx < open as usize)
                             .unwrap_or_else(|_e| {
                                 eprintln!("Can't process {} : {}", input_path.display(), _e);
                             });
+                    Ok(())
                     });
+                    Ok(())
                 });
             }
             Err(e) => {
-                eprintln!("Failed to create temporary directory: {}", e);
-                return;
+                return Err(e.into());
             }
         }
         println!("\x1b[1m>> \x1b[0mPress Enter to exit and delete temporary files...");
@@ -77,15 +70,16 @@ pub fn run(
             });
         });
     }
+    Ok(())
 }
 
 fn view_processing(
     input_path: &mut PathBuf,
     output_path: &mut PathBuf,
     is_to_open: bool,
-) -> Result<(), Box<dyn Error>> {
-    let dinput_path = input_path.to_str().ok_or("Can't open the path")?;
-    let obj = open_file(dinput_path)?;
+) -> Result<()> {
+    // let dinput_path = input_path.to_str()?;
+    let obj = open_file(input_path.as_path())?;
 
     output_handling(input_path, output_path)?;
 

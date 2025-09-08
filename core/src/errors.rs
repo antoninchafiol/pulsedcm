@@ -6,12 +6,14 @@ use crate::errors::fmt::Formatter;
 #[derive(Debug)]
 pub enum DicomError {
     Read(dicom_object::ReadError),
+    PixelData(dicom_pixeldata::Error),
 }
 
 impl Display for DicomError {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
             Self::Read(e) => write!(f, "Read: {}", e ),
+            Self::PixelData(e) => write!(f, "Read: {}", e ),
         }
     }
 }
@@ -19,7 +21,8 @@ impl Display for DicomError {
 impl Error for DicomError {
     fn source(&self) -> Option<&(dyn Error + 'static)> { 
         match self { 
-            Self::Read(source) => Some(source),
+            Self::Read(s) => Some(s),
+            Self::PixelData(s) => Some(s),
             // _ => None,
         }
     }
@@ -60,6 +63,7 @@ impl Display for PulseErrorKind {
             Self::UnsupportedComponent => write!(f, "Unsupported number of components"),
         }
     }
+}
 
 impl Error for PulseErrorKind {
     fn source(&self) -> Option<&(dyn Error + 'static)> { 
@@ -72,6 +76,10 @@ impl Error for PulseErrorKind {
             Self::ImageError(s) => Some(s),
             Self::CodecError(s) => Some(s),
             Self::CSV(s) => Some(s),
+
+
+            Self::UnsupportedComponent => None,
+            Self::UnsupportedPixelData => None,
         }
     }
 }
@@ -158,31 +166,18 @@ impl From<jp2k::err::Error> for PulseError {
     }
 }
 
+impl From<image::ImageError> for PulseError {
+    fn from(e: image::ImageError) -> Self { Self { 
+            kind: PulseErrorKind::ImageError(e), 
+            message: "CSV error".to_string(), 
+        }
+    }
+}
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+impl From<dicom_pixeldata::Error> for PulseError {
+    fn from(e: dicom_pixeldata::Error) -> Self { Self { 
+            kind: PulseErrorKind::Dicom(DicomError::PixelData(e)), 
+            message: "CSV error".to_string(), 
+        }
+    }
+}

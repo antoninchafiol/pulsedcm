@@ -38,9 +38,10 @@ pub fn run(path: &str, args: ViewArgs){
         }),
         args.jobs.clone()
     ){
-        Ok(_) => {},
+        Ok(_) => { return; },
         Err(e) => {
             eprintln!("Error when running view command: {}", e);
+            return;
         }
    };
 }

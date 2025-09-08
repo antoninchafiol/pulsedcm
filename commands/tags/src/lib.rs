@@ -39,8 +39,8 @@ pub fn run(
         .num_threads(jobs)
         .build()?;
 
-    thread_pool.install(|| {
-        files.par_iter().try_for_each(
+    let _ = thread_pool.install(|| -> Result<()> {
+        let _ = files.par_iter().try_for_each(
             |f: &PathBuf| -> Result<()> {
                 let mut out_string = String::new();
                 let path = f.as_os_str().to_str().unwrap_or("No path");
@@ -70,12 +70,13 @@ pub fn run(
                 Ok(())
             });
         if let Some(json_path) = json.clone() {
-            write_tag_files("json", json_path, &export_data);
+            let _ = write_tag_files("json", json_path, &export_data);
         }
 
         if let Some(csv_path) = csv.clone() {
-            write_tag_files("csv", csv_path, &export_data);
+            let _ = write_tag_files("csv", csv_path, &export_data);
         }
+        Ok(())
     });
     Ok(())
 }
