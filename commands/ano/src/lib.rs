@@ -1,13 +1,40 @@
-use std::path::PathBuf;
+use std::{path::PathBuf};
 
 use pulsedcm_core::*;
 
 /// Enum linked to the Actions part of the anonymization command
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
-pub enum Actions {
+pub enum Action {
     Replace,
     Zero,
     Remove,
+}
+impl Action {
+    pub fn processing_data(&self, data: &mut FileDicomObject<InMemDicomObject>, tag: &Tag){
+        match self {
+                Self::Zero => {
+                    data.update_value_at(*tag, |value| {
+                        *value.primitive_mut().unwrap() = PrimitiveValue::from("0");
+                    })
+                    .unwrap_or_else(|err| {
+                        eprintln!("Warning: couldn’t replace tag {:?}: {}", tag, err)
+                    });
+                }
+                Self::Remove => {
+                    if !data.remove_element(*tag) {
+                        eprintln!("Warning: couldn’t remove tag {:?}", tag);
+                    }
+                }
+                Self::Replace => {
+                    data.update_value_at(*tag, |value| {
+                        *value.primitive_mut().unwrap() = PrimitiveValue::from("Anonymized");
+                    })
+                    .unwrap_or_else(|err| {
+                        eprintln!("Warning: couldn’t replace tag {:?}: {}", tag, err)
+                    });
+                }
+        }
+    }
 }
 
 /// Enum linked to the policy part of the anonymization command
@@ -104,47 +131,61 @@ impl Policy {
 
 pub fn run(
     path: &str,
-    action: Actions,
+    action: Action,
     policy: Policy,
     out: PathBuf,
-    dry: bool,
+    dry: &mut bool,
     verbose: bool,
     jobs: Option<usize>,
-) {
-    let files = match list_all_files(path) {
-        Ok(o) => o,
-        Err(e) => {
-            eprintln!("Error: {}", e);
-            return;
-        }
-    };
+) -> Result<()> {
+    let files = collect_dicom_files(path)?;
     let jobs: usize = jobs_handling(jobs, files.len());
-    let thread_pool = rayon::ThreadPoolBuilder::new()
-        .num_threads(jobs as usize)
-        .build()
-        .unwrap();
-    thread_pool.install(|| {
-        files.par_iter().enumerate().for_each(|(idx, file)| {
-            let mut out_clone = out.clone();
-            ano_threaded_function(idx, file, &mut out_clone, dry, &action, &policy, verbose);
-        });
-    });
+    let _ = threading_handling(files, out, &action, &policy, verbose, jobs, dry)?;
+    Ok(())
 }
 
-fn ano_threaded_function(
-    idx: usize,
-    file: &String,
-    out: &mut PathBuf,
-    dry: bool,
-    action: &Actions,
+fn threading_handling(
+    files: Vec<PathBuf>, 
+    output_path: PathBuf,
+    action: &Action,
+    policy: &Policy,
+    verbose: bool, 
+    jobs: usize,
+    dry: &mut bool, 
+    ) -> Result<()> {
+    
+    let thread_pool = rayon::ThreadPoolBuilder::new()
+        .num_threads(jobs)
+        .build()?;
+
+    if let Some(first) = files.first(){
+            single_thread_process(first.into(), &mut output_path.clone(),  &action, &policy, verbose , dry)?;
+            *dry = false;
+    }
+    let _ = thread_pool.install(|| {
+        let _ = files.par_iter().try_for_each(
+            |file: &PathBuf| -> Result<()> {
+                single_thread_process(file.into(), &mut output_path.clone(),  &action, &policy, verbose , dry)?;
+                Ok(())
+        });
+    });
+
+    Ok(())
+}
+
+fn single_thread_process(
+    input_path: PathBuf,
+    output_path: &mut PathBuf,
+    action: &Action,
     policy: &Policy,
     verbose: bool,
-) {
-    if dry && idx == 0 {
+    dry: &bool,
+) -> Result<()> {
+    if *dry {
         if verbose {
             println!("Launching a dry run");
         }
-        let data = ano_file_process(PathBuf::from(file), &action, &policy, verbose);
+        let data = anonymize_file(input_path, &action, &policy, verbose)?;
 
         for element in data.into_iter() {
             let tag: Tag = element.header().tag;
@@ -161,92 +202,60 @@ fn ano_threaded_function(
             let mut s = String::new();
             print_colorize(tag, vr.to_string(), value.as_str(), name, &mut s);
         }
-        return;
+        return Ok(());
     }
+
+    let filename = input_path.file_name().unwrap_or_default();
+
     // Case where out is not specified
-    if file.as_str() == out.as_os_str().to_str().unwrap() {
-        if ask_yes_no("? No out specified confirm to overwrite actual files") {
-            let filename = Path::new(file).file_name().unwrap();
-            out.to_owned().push(filename);
-            let data = ano_file_process(PathBuf::from(file), &action, &policy, verbose);
-            match data.write_to_file(&out) {
-                Ok(_o) => {
-                    println!("Wrote succesfully to: {}", &out.display());
-                }
-                Err(e) => {
-                    eprintln!("Error while writing to file: {}", e);
-                }
-            };
+    if input_path.to_str().unwrap_or_default() == output_path.as_os_str().to_str().unwrap_or_default() {
+        if ask_yes_no("? No output_path specified confirm to overwrite actual files") {
+            output_path.push(filename);
+            let data = anonymize_file(input_path,  &action, &policy, verbose)?;
+            data.write_to_file(&output_path)?;
         } else {
             println!("Stopping...");
-            return;
+            return Ok(());
         }
     } else {
-        if !out.is_dir() {
+        if !output_path.is_dir() {
             eprintln!("Output path shouldn't be a file");
-            return;
+            return Ok(());
         }
-        let filename = Path::new(file).file_name().unwrap();
-        out.push(filename);
+        output_path.push(filename);
 
-
-
-        let data = ano_file_process(PathBuf::from(file), &action, &policy, verbose);
-        match data.write_to_file(&out) {
-            Ok(_o) => {
-                println!("Wrote succesfully to: {}", &out.display());
-            }
-            Err(e) => {
-                eprintln!("Error while writing to file: {}", e);
-            }
-        };
+        let data = anonymize_file(input_path, &action, &policy, verbose)?;
+        data.write_to_file(&output_path)?;
     }
+    Ok(())
 }
 
-fn ano_file_process(
-    path: PathBuf,
-    action: &Actions,
-    policy: &Policy,
-    verbose: bool,
-) -> FileDicomObject<InMemDicomObject> {
-    let mut data = open_file(path).unwrap();
+fn anonymize_file (
+    file_path: PathBuf, 
+    action: &Action, 
+    policy: &Policy, 
+    verbose: bool
+) -> Result<FileDicomObject<InMemDicomObject>> {
+    let mut data = open_file(file_path)?;
     let original_len = data.iter().count();
-    let filter = policy.tags();
-    for tag in filter {
-        if let Err(_) = data.element(tag) {
-            eprintln!("Warning: Tag {} can't be found and will be ignored", tag);
+    for tag in policy.tags() {
+        if data.element(tag).is_err() {
+            if verbose {
+                eprintln!("Warning: Tag {} can't be found and will be ignored", tag);
+            }
         } else {
-            match action {
-                Actions::Zero => {
-                    data.update_value_at(tag, |value| {
-                        *value.primitive_mut().unwrap() = PrimitiveValue::from("0");
-                    })
-                    .unwrap_or_else(|err| {
-                        eprintln!("Warning: couldn’t replace tag {:?}: {}", tag, err)
-                    });
-                }
-                Actions::Remove => {
-                    if !data.remove_element(tag) {
-                        eprintln!("Warning: couldn’t remove tag {:?}", tag);
-                    }
-                }
-                Actions::Replace => {
-                    data.update_value_at(tag, |value| {
-                        *value.primitive_mut().unwrap() = PrimitiveValue::from("Anonymized");
-                    })
-                    .unwrap_or_else(|err| {
-                        eprintln!("Warning: couldn’t replace tag {:?}: {}", tag, err)
-                    });
-                }
-            };
-        }
+            action.processing_data(&mut data, &tag);
+        };
     }
     if verbose {
         println!(
-            "Original Length: {} -> New Length : {}",
-            original_len,
-            data.iter().count()
+            "Removed/Changed Tags: {}",
+            original_len - data.iter().count()
         );
     }
-    data
+    Ok(data)
 }
+
+
+
+

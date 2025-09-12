@@ -6,6 +6,7 @@ use crate::errors::fmt::Formatter;
 #[derive(Debug)]
 pub enum DicomError {
     Read(dicom_object::ReadError),
+    Write(dicom_object::WriteError),
     PixelData(dicom_pixeldata::Error),
 }
 
@@ -13,6 +14,7 @@ impl Display for DicomError {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
             Self::Read(e) => write!(f, "Read: {}", e ),
+            Self::Write(e) => write!(f, "Write: {}", e ), 
             Self::PixelData(e) => write!(f, "Read: {}", e ),
         }
     }
@@ -22,6 +24,7 @@ impl Error for DicomError {
     fn source(&self) -> Option<&(dyn Error + 'static)> { 
         match self { 
             Self::Read(s) => Some(s),
+            Self::Write(s) => Some(s),
             Self::PixelData(s) => Some(s),
             // _ => None,
         }
@@ -136,6 +139,16 @@ impl From<dicom_object::ReadError> for PulseError {
     }
 }
 
+impl From<dicom_object::WriteError> for PulseError {
+    fn from(e: dicom_object::WriteError) -> Self { Self { 
+            kind: PulseErrorKind::Dicom(DicomError::Write(e)), 
+            message: "DICOM Write to file error".to_string(), 
+        }
+    }
+}
+
+
+
 impl<T> From<std::sync::PoisonError<std::sync::MutexGuard<'_, T>>> for PulseError {
     fn from(err: std::sync::PoisonError<std::sync::MutexGuard<'_, T>>) -> Self {
         PulseError::new(PulseErrorKind::ThreadPoison(err.to_string()), "Mutex poisoned")
@@ -181,3 +194,6 @@ impl From<dicom_pixeldata::Error> for PulseError {
         }
     }
 }
+
+
+
