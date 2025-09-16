@@ -2,6 +2,7 @@ use clap::Args;
 use std::path::PathBuf;
 
 use pulsedcm_commands_tags::{run as tag_run, TagFlags};
+use crate::commands::CliCommand;
 
 #[derive(Args, Debug)]
 pub struct TagsArgs {
@@ -29,6 +30,25 @@ pub struct TagsArgs {
     csv: Option<PathBuf>,
 }
 
+impl CliCommand for TagsArgs {
+    fn run(&self, path: &str) {
+        match tag_run(
+            path,
+            &self.kind,
+            self.with_pixel_data,
+            self.jobs,
+            self.json.clone(),
+            self.csv.clone(),
+        ){
+            Ok(_) => {},
+            Err(e) => {
+                eprintln!("Error when running ano command: {}", e);
+            }
+        };
+    }
+}
+
+
 fn parse_tag_flags(s: &str) -> Result<TagFlags, String> {
     match s.to_lowercase().as_str() {
         "all" => Ok(TagFlags::All),
@@ -49,18 +69,3 @@ fn parse_tag_flags(s: &str) -> Result<TagFlags, String> {
     }
 }
 
-pub fn run(path: &str, args: TagsArgs) {
-    match tag_run(
-        path,
-        args.kind.clone(),
-        args.with_pixel_data,
-        args.jobs.clone(),
-        args.json.clone(),
-        args.csv.clone(),
-    ) {
-        Ok(_) => {},
-        Err(e) => {
-            eprintln!("Error when running tags command: {}", e);
-        }
-    };
-}

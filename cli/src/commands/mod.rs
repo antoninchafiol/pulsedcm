@@ -1,6 +1,5 @@
 use clap::Subcommand;
 
-use crate::commands::{ano::AnoArgs, tags::TagsArgs, view::ViewArgs};
 
 // ==== Commands ==== 
 mod tags;
@@ -17,8 +16,8 @@ pub enum Commands {
 
 pub fn handling(path: &str, cmd: Commands) {
     match cmd {
-        Commands::Tags(args) => tags::run(path, args),
-        Commands::View(args) => view::run(path, args),
+        Commands::Tags(args) => args.run(path),
+        Commands::View(args) => args.run(path),
         Commands::Ano(args) => args.run(path),
     }
 }

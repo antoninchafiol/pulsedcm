@@ -131,16 +131,16 @@ impl Policy {
 
 pub fn run(
     path: &str,
-    action: Action,
-    policy: Policy,
-    out: PathBuf,
+    action: &Action,
+    policy: &Policy,
+    out: &PathBuf,
     dry: &mut bool,
     verbose: bool,
     jobs: Option<usize>,
 ) -> Result<()> {
     let files = collect_dicom_files(path)?;
     let jobs: usize = jobs_handling(jobs, files.len());
-    let _ = threading_handling(files, out, &action, &policy, verbose, jobs, dry)?;
+    let _ = threading_handling(files, out.clone(), action, policy, verbose, jobs, dry)?;
     Ok(())
 }
 

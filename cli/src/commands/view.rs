@@ -2,7 +2,7 @@ use clap::Args;
 use std::path::PathBuf;
 
 use pulsedcm_commands_view::{run as view_run};
-
+use crate::commands::CliCommand;
 #[derive(Args, Debug)]
 pub struct ViewArgs {
 
@@ -27,25 +27,27 @@ pub struct ViewArgs {
 
 } 
 
-pub fn run(path: &str, args: ViewArgs){
-   match view_run(
-        path, 
-        args.open.unwrap_or(0), 
-        args.temp, 
-        args.out.unwrap_or_else(|| {
-            println!("Out argument not provided, taking the path of input"); 
-            PathBuf::from(&path)
-        }),
-        args.jobs.clone()
-    ){
-        Ok(_) => { return; },
-        Err(e) => {
-            eprintln!("Error when running view command: {}", e);
-            return;
-        }
-   };
+
+
+impl CliCommand for ViewArgs {
+    fn run(&self, path: &str) {
+        let default_out_path = PathBuf::from(&path);
+        match view_run(
+            path, 
+            self.open.unwrap_or(0), 
+            self.temp, 
+            self.out.as_ref().unwrap_or_else(|| {
+                println!("out argument has issue when parsing"); 
+                &default_out_path
+            }),
+            self.jobs,
+        ){
+            Ok(_) => {},
+            Err(e) => {
+                eprintln!("Error when running ano command: {}", e);
+            }
+        };
+    }
 }
-
-
 
 

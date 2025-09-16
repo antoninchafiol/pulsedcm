@@ -12,7 +12,7 @@ pub fn run(
     path: &str, 
     open: u8, 
     temp: bool,
-    out: PathBuf,
+    out: &PathBuf,
     jobs: Option<usize>
 ) -> Result<()> {
     let mut open: u8 = open;

@@ -75,13 +75,16 @@ fn parse_policy(input: &str) -> Result<Policy, String>{
 impl CliCommand for AnoArgs {
     fn run(&self, path: &str) {
         let mut dry_arg = self.dry;
+        let default_out_path = PathBuf::from(&path);
         match ano_run(
             path, 
-            self.action.unwrap_or(Action::Zero), 
-            self.policy.unwrap_or(Policy::Basic), 
-            self.out.unwrap_or_else(|| {
-                println!("out argument has issue when parsing"); 
-                PathBuf::from(&path)
+            self.action.as_ref().unwrap_or(&Action::Zero), 
+            self.policy.as_ref().unwrap_or(&Policy::Basic), 
+            self.out.as_ref().unwrap_or_else(|| {
+                if self.verbose {
+                    println!("out argument has issue when parsing"); 
+                }
+                &default_out_path
             }),
             &mut dry_arg, 
             self.verbose,
@@ -93,25 +96,4 @@ impl CliCommand for AnoArgs {
             }
         };
     }
-}
-
-pub fn run(path: &str, args: AnoArgs){
-    let mut dry_arg = args.dry;
-    match ano_run(
-        path, 
-        args.action.unwrap_or(Action::Zero), 
-        args.policy.unwrap_or(Policy::Basic), 
-        args.out.unwrap_or_else(|| {
-            println!("out argument has issue when parsing"); 
-            PathBuf::from(&path)
-        }),
-        &mut dry_arg, 
-        args.verbose,
-        args.jobs,
-    ){
-        Ok(_) => {},
-        Err(e) => {
-            eprintln!("Error when running ano command: {}", e);
-        }
-    };
 }

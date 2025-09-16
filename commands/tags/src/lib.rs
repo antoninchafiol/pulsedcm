@@ -23,7 +23,7 @@ pub enum TagFlags {
 
 pub fn run(
     path: &str,
-    kind: TagFlags,
+    kind: &TagFlags,
     with_pixel_data: bool,
     jobs: Option<usize>,
     json: Option<PathBuf>,
