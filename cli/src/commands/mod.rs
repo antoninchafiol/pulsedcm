@@ -1,5 +1,7 @@
 use clap::Subcommand;
 
+use crate::commands::{ano::AnoArgs, tags::TagsArgs, view::ViewArgs};
+
 // ==== Commands ==== 
 mod tags;
 mod view;
@@ -17,6 +19,12 @@ pub fn handling(path: &str, cmd: Commands) {
     match cmd {
         Commands::Tags(args) => tags::run(path, args),
         Commands::View(args) => view::run(path, args),
-        Commands::Ano(args) => ano::run(path, args),
+        Commands::Ano(args) => args.run(path),
     }
 }
+
+
+pub trait CliCommand {
+    fn run(&self, path: &str);
+}
+

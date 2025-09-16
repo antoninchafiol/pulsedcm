@@ -3,6 +3,8 @@ use std::path::PathBuf;
 
 use pulsedcm_commands_ano::{run as ano_run, Action, Policy};
 
+use crate::commands::{CliCommand};
+
 #[derive(Args, Debug)]
 pub struct AnoArgs {
     /// strategy of de-idenficication:
@@ -47,7 +49,6 @@ pub struct AnoArgs {
     verbose: bool,
 
 } 
-
 fn parse_actions(input: &str) -> Result<Action, String>{
     match input.to_lowercase().as_str() {
         "replace" => Ok(Action::Replace),
@@ -67,6 +68,30 @@ fn parse_policy(input: &str) -> Result<Policy, String>{
         _other => {
             Err("should be either: 'basic', 'moderate' or 'strict'".to_string())
         }
+    }
+}
+
+
+impl CliCommand for AnoArgs {
+    fn run(&self, path: &str) {
+        let mut dry_arg = self.dry;
+        match ano_run(
+            path, 
+            self.action.unwrap_or(Action::Zero), 
+            self.policy.unwrap_or(Policy::Basic), 
+            self.out.unwrap_or_else(|| {
+                println!("out argument has issue when parsing"); 
+                PathBuf::from(&path)
+            }),
+            &mut dry_arg, 
+            self.verbose,
+            self.jobs,
+        ){
+            Ok(_) => {},
+            Err(e) => {
+                eprintln!("Error when running ano command: {}", e);
+            }
+        };
     }
 }
 
