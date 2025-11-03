@@ -1,9 +1,9 @@
 use clap::Args;
 use std::path::PathBuf;
 
-use pulsedcm_commands_ano::{run as ano_run, Action, Policy};
+use pulsedcm_commands_ano::{Action, Policy, threading_handling};
 
-use crate::commands::{CliCommand};
+use crate::commands::{ArgRun};
 
 #[derive(Args, Debug)]
 pub struct AnoArgs {
@@ -29,10 +29,6 @@ pub struct AnoArgs {
     )]
     policy: Option<Policy>,
 
-    /// Number of threads to launch to process (0 = All possible threads)
-    #[arg(long, value_name="NUMBER")]
-    jobs: Option<usize>,
-
     /// Output directory to save anonymized files.
     /// If omitted, input files will be overwritten in-place.
     /// Must be a directory if specified.
@@ -43,10 +39,6 @@ pub struct AnoArgs {
     /// If multiple files it'll stop processing after the 1st to give an output
     #[arg(short, long, default_value= "false")]
     dry: bool,
-
-    /// Show all changed values
-    #[arg(short, long)]
-    verbose: bool,
 
 } 
 fn parse_actions(input: &str) -> Result<Action, String>{
@@ -72,23 +64,23 @@ fn parse_policy(input: &str) -> Result<Policy, String>{
 }
 
 
-impl CliCommand for AnoArgs {
-    fn run(&self, path: &str) {
+impl ArgRun for AnoArgs {
+    fn run_multiple(self, path: &str, files: Vec<PathBuf>,  verbose:bool, jobs:usize) {
         let mut dry_arg = self.dry;
         let default_out_path = PathBuf::from(&path);
-        match ano_run(
-            path, 
-            self.action.as_ref().unwrap_or(&Action::Zero), 
-            self.policy.as_ref().unwrap_or(&Policy::Basic), 
-            self.out.as_ref().unwrap_or_else(|| {
-                if self.verbose {
+        match threading_handling(
+            files, 
+            self.out.unwrap_or_else(|| {
+                if verbose {
                     println!("out argument has issue when parsing"); 
                 }
-                &default_out_path
+                default_out_path
             }),
+            self.action.unwrap_or(Action::Zero), 
+            self.policy.unwrap_or(Policy::Basic), 
             &mut dry_arg, 
-            self.verbose,
-            self.jobs,
+            jobs,
+            verbose,
         ){
             Ok(_) => {},
             Err(e) => {

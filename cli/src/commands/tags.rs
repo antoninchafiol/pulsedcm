@@ -2,7 +2,7 @@ use clap::Args;
 use std::path::PathBuf;
 
 use pulsedcm_commands_tags::{run as tag_run, TagFlags};
-use crate::commands::CliCommand;
+use crate::commands::ArgRun;
 
 #[derive(Args, Debug)]
 pub struct TagsArgs {
@@ -30,15 +30,15 @@ pub struct TagsArgs {
     csv: Option<PathBuf>,
 }
 
-impl CliCommand for TagsArgs {
-    fn run(&self, path: &str) {
+impl ArgRun for TagsArgs {
+    fn run_multiple(self, path: &str, files: Vec<PathBuf>, verbose: bool, jobs: usize) { 
         match tag_run(
-            path,
-            &self.kind,
+            files, 
+            self.kind,
             self.with_pixel_data,
-            self.jobs,
-            self.json.clone(),
-            self.csv.clone(),
+            jobs,
+            self.json,
+            self.csv,
         ){
             Ok(_) => {},
             Err(e) => {

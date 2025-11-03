@@ -9,17 +9,15 @@ use jp2k::{Codec, DecodeParams, ImageBuffer, Stream};
 use image;
 
 pub fn run(
-    path: &str, 
+    files: Vec<PathBuf>,
     open: u8, 
     temp: bool,
-    out: &PathBuf,
-    jobs: Option<usize>
+    out: PathBuf,
+    jobs: usize
 ) -> Result<()> {
     let mut open: u8 = open;
     let is_temp: bool = temp;
 
-    let files = collect_dicom_files(path)?;
-    let jobs: usize = jobs_handling(jobs, files.len());
 
     let thread_pool = rayon::ThreadPoolBuilder::new()
         .num_threads(jobs as usize)

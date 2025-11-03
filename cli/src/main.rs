@@ -12,10 +12,18 @@ struct Cli {
 
     #[command(subcommand)]
     command: commands::Commands,
+
+    /// Number of threads to launch to process
+    #[arg(long, value_name = "NUMBER")]
+    jobs: Option<usize>,
+
+    /// Show all changed values
+    #[arg(short, long)]
+    verbose: bool,
 }
 
 
 fn main() {
     let cli = Cli::parse();
-    commands::handling(&cli.path, cli.command);
+    commands::handling(&cli.path, cli.command, cli.verbose, cli.jobs);
 }

@@ -22,16 +22,14 @@ pub enum TagFlags {
 }
 
 pub fn run(
-    path: &str,
-    kind: &TagFlags,
+    files: Vec<PathBuf>,
+    kind: TagFlags,
     with_pixel_data: bool,
-    jobs: Option<usize>,
+    jobs: usize,
     json: Option<PathBuf>,
     csv: Option<PathBuf>,
 ) -> Result<()> {
     // Setting up all components
-    let files = collect_dicom_files(path)?;
-    let jobs = jobs_handling(jobs, files.len());
     let to_display = csv.is_some() || json.is_some();
 
     let export_data = Mutex::new(Vec::<SerializableDicomEntry>::new());
