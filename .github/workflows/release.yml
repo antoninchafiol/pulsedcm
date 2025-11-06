@@ -8,6 +8,9 @@ on:
 permissions:
   contents: write   
 jobs:
+
+
+
   build:
     name: Build for ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
@@ -17,6 +20,10 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: | 
+          sudo apt install -y pkg-config libopenjp2-7-dev libvips-dev clang libclang-dev
 
       - name: Install Rust (stable)
         uses: actions-rs/toolchain@v1
