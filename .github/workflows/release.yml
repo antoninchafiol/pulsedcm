@@ -6,24 +6,20 @@ on:
       - "v*.*"
 
 permissions:
-  contents: write   
+  contents: write
+
 jobs:
-
-
-
   build:
-    name: Build for ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+    name: Build (Ubuntu)
+    runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
 
       - name: Install system dependencies
-        run: | 
-          sudo apt install -y pkg-config libopenjp2-7-dev libvips-dev clang libclang-dev
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libopenjp2-7-dev libvips-dev clang libclang-dev
 
       - name: Install Rust (stable)
         uses: actions-rs/toolchain@v1
@@ -34,26 +30,16 @@ jobs:
       - name: Build (release)
         run: cargo build --release
 
-      - name: Package (macOS / Linux)
-        if: runner.os != 'Windows'
+      - name: Package (Linux)
         run: |
           TAG=${{ github.ref_name }}
-          OSNAME="${{ runner.os }}"
-          os_lower=$(echo "$OSNAME" | tr '[:upper:]' '[:lower:]')
-          tar -C target/release -czf pulsedcm-${TAG}-${os_lower}-x86_64.tar.gz pulsedcm-cli
-
-      - name: Package (Windows)
-        if: runner.os == 'Windows'
-        shell: powershell
-        run: |
-          $tag = '${{ github.ref_name }}'
-          Compress-Archive -Path target\release\pulsedcm-cli.exe -DestinationPath "pulsedcm-$tag-windows-x86_64.zip"
+          tar -C target/release -czf pulsedcm-${TAG}-linux-x86_64.tar.gz pulsedcm-cli
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: pulsedcm-${{ matrix.os }}
-          path: pulsedcm-${{ github.ref_name }}-*
+          name: pulsedcm-linux
+          path: pulsedcm-${{ github.ref_name }}-linux-x86_64.tar.gz
 
   create_release:
     name: Create Release and attach artifacts
