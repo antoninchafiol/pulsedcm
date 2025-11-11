@@ -1,5 +1,7 @@
-use std::{path::PathBuf};
+use std::{ path::PathBuf};
 
+pub mod models;
+// pub use models;
 use pulsedcm_core::*;
 
 /// Enum linked to the Actions part of the anonymization command
@@ -128,6 +130,7 @@ impl Policy {
         }
     }
 }
+
 
 pub fn threading_handling(
     files: Vec<PathBuf>, 
