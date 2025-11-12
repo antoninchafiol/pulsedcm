@@ -6,3 +6,4 @@ edition = "2021"
 
 [dependencies]
 pulsedcm-core = { path = "../../core" }
+phf = "0.13.1"

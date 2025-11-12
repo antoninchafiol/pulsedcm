@@ -17,7 +17,7 @@ impl Action {
                 Self::Zero => {
                     data.update_value_at(*tag, |value| {
                         *value.primitive_mut().unwrap() = PrimitiveValue::from("0");
-                    })
+    })
                     .unwrap_or_else(|err| {
                         eprintln!("Warning: couldn’t replace tag {:?}: {}", tag, err)
                     });
@@ -244,6 +244,23 @@ fn anonymize_file (
     Ok(data)
 }
 
+fn de_identification (
+    file_path: PathBuf, 
+    // profile: Profile :TODO: Later implement the profile to match the right 
+    // one in policyAction
+    verbose: bool
+) {
+    let mut data = open_file(file_path)?;
+    for element in data.into_iter() {
+        let tag = element.header().tag;
+        let vr = element.header().vr;
+        // Check if contains
+        // if yes: apply the 1st profile
+        // + check for the rest of profiles to add afterwards 
+        // else : pass
+    }
 
 
 
+
+}
