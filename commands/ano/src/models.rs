@@ -46,32 +46,26 @@ fn dummy_from_vr(vr: &VR) -> PrimitiveValue{
         VR::US => PrimitiveValue::from(0_u16),
         VR::UV => PrimitiveValue::from(0_u64),
 
-        // Binary/Other (empty slices)
-        VR::OB => PrimitiveValue::from(Vec::<u8>::new()),
-        VR::OD => PrimitiveValue::from(Vec::<f64>::new()),
-        VR::OF => PrimitiveValue::from(Vec::<f32>::new()),
-        VR::OL => PrimitiveValue::from(Vec::<u32>::new()),
-        VR::OV => PrimitiveValue::from(Vec::<u64>::new()),
-        VR::OW => PrimitiveValue::from(Vec::<u16>::new()),
-        VR::UN => PrimitiveValue::from(Vec::<u8>::new()),
-
         // Tag / Sequence
         VR::AT => PrimitiveValue::from("(0000,0000)"),
-        VR::SQ => PrimitiveValue::Empty, // sequences are complex; better to remove or keep empty
 
+        VR::OB|VR::OD|VR::OF|VR::OL|VR::OV|VR::OW|VR::UN|VR::SQ => {
+            PrimitiveValue::Empty
+        }
         // Fallback for anything new or unknown
         _ => PrimitiveValue::Empty,    
     }
 }
 
 impl ActionCode {
-    pub fn process(&self, data: &mut FileDicomObject<InMemDicomObject>, tag: &Tag) {
+    pub fn process(&self, data: &mut FileDicomObject<InMemDicomObject>, tag: &Tag, vr: &VR) {
         match self {
-            Self::D => { data.update_value_at(*tag, |v| {
-                *v.primitive_mut().unwrap() = PrimitiveValue::from("DUMMY");
-                
-            )},
-            Self::Z => {data.},
+            Self::D => {}, 
+                // data.update_value_at(*tag, |v| {
+            //     *v.primitive_mut().unwrap() = dummy_from_vr(vr);
+            // }   
+            // )},
+            Self::Z => {},
             Self::X => {},
             Self::K => {},
             Self::C => {},
