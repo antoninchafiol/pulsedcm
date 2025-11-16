@@ -4,6 +4,8 @@ pub mod models;
 // pub use models;
 use pulsedcm_core::*;
 
+use crate::models::DEID_HASH;
+
 /// Enum linked to the Actions part of the anonymization command
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
 pub enum Action {
@@ -249,17 +251,33 @@ fn de_identification (
     // profile: Profile :TODO: Later implement the profile to match the right 
     // one in policyAction
     verbose: bool
-) {
+) -> Result<FileDicomObject<InMemDicomObject>> {
     let mut data = open_file(file_path)?;
-    for element in data.into_iter() {
-        let tag = element.header().tag;
-        let vr = element.header().vr;
-        // Check if contains
-        // if yes: apply the 1st profile
-        // + check for the rest of profiles to add afterwards 
-        // else : pass
-    }
 
+    for (key, value) in DEID_HASH.entries() {
+        let rec_tag: Tag = Tag{0: key.0, 1:key.1};
+        // Check if in 
+        if let Ok(elem) = data.element(rec_tag) {
+            let vr = elem.vr();
+            value.basic.process(&mut data, &rec_tag, &vr);
+        } else {
+            continue;
+        }
+    }
+    Ok(data)
+
+
+    // for element in data.into_iter() {
+    //     let tag = element.header().tag;
+    //     // TODO: Get both u16 and change the DEID HASH from Tag to (u16, u16)
+    //     let vr = element.header().vr;
+    //     // Check if contains
+    //     // if yes: apply the 1st profile
+    //     // + check for the rest of profiles to add afterwards 
+    //     // else : pass
+    // }
+    // }
+    // Ok(data)
 
 
 
