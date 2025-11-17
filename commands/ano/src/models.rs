@@ -64,14 +64,14 @@ fn dummy_from_vr(vr: &VR) -> PrimitiveValue{
 }
 
 impl ActionCode {
-    pub fn process(&self, data: &mut InMemDicomObject, tag: &Tag, vr: &VR) -> Result<FileDicomObject<InMemDicomObject>>  {
+    pub fn process(&self, data: &mut InMemDicomObject, tag: &Tag, vr: &VR) -> Result<()>  {
         match self {
             Self::D => {
                 // Replace with dummy value consistent with the VR
                 data.update_value_at(*tag, |v|{
                     *v.primitive_mut().unwrap() = dummy_from_vr(vr);
                 })?;
-                Ok(data)
+                Ok(())
             }, 
             Self::Z => {
 
@@ -79,32 +79,35 @@ impl ActionCode {
                 // TODO: Handle if Empty is processed, otherwise use the dummy_from_vr
                 data.update_value_at(*tag, |v|{
                     *v.primitive_mut().unwrap() = PrimitiveValue::Empty;
-                });
-
+                })?;
+                Ok(())
             },
             Self::X => {
                 // Remove
                 if !data.remove_element(*tag) {
                     eprintln!("Couldn't remove tag {:?}", tag);
                 }
-            },
-            Self::K => {
-                // Keep non SQ and de-identify SQ
-                data.update_value_at(*tag, |v|{
-                    if *vr == VR::SQ{
-                        if let Value::Sequence(ref mut items) = v {
-                            for i in items.items_mut() {
-                                Self::process(&self, i, tag, vr);
-                            }
-                        }
-                    }
-                });
+                Ok(())
 
             },
+            // Self::K => {
+            //     // Keep non SQ and de-identify SQ
+            //     data.update_value_at(*tag, |&mut v| -> Result<()>{
+            //         if *vr == VR::SQ{
+            //             if let Value::Sequence(ref mut items) = v {
+            //                 for i in items.items_mut() {
+            //                     Self::process(&self, i, tag, vr)?;
+            //                 }
+            //             }
+            //         }
+            //     })?;
+            //     Ok(())
+            // },
             _ => {
                 data.update_value_at(*tag, |v|{
                     *v.primitive_mut().unwrap() = dummy_from_vr(vr);
-                });
+                })?;
+                Ok(())
             }
             // Self::C => {},
             // Self::U => {},
