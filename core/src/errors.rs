@@ -6,6 +6,7 @@ use crate::errors::fmt::Formatter;
 #[derive(Debug)]
 pub enum DicomError {
     Read(dicom_object::ReadError),
+    Access(dicom_object::AtAccessError),
     Write(dicom_object::WriteError),
     PixelData(dicom_pixeldata::Error),
 }
@@ -14,6 +15,7 @@ impl Display for DicomError {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
             Self::Read(e) => write!(f, "Read: {}", e ),
+            Self::Access(e) => write!(f, "Access: {}", e ),
             Self::Write(e) => write!(f, "Write: {}", e ), 
             Self::PixelData(e) => write!(f, "Read: {}", e ),
         }
@@ -24,6 +26,7 @@ impl Error for DicomError {
     fn source(&self) -> Option<&(dyn Error + 'static)> { 
         match self { 
             Self::Read(s) => Some(s),
+            Self::Access(s) => Some(s),
             Self::Write(s) => Some(s),
             Self::PixelData(s) => Some(s),
             // _ => None,
@@ -136,6 +139,12 @@ impl From<rayon::ThreadPoolBuildError> for PulseError {
 impl From<dicom_object::ReadError> for PulseError {
     fn from(e: dicom_object::ReadError) -> Self {
         PulseError::new(PulseErrorKind::Dicom(DicomError::Read(e)), "DICOM error")
+    }
+}
+
+impl From<dicom_object::AtAccessError> for PulseError {
+    fn from(e: dicom_object::AtAccessError) -> Self {
+        PulseError::new(PulseErrorKind::Dicom(DicomError::Access(e)), "DICOM error")
     }
 }
 

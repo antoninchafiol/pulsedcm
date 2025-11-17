@@ -1,4 +1,4 @@
-use pulsedcm_core::{FileDicomObject, InMemDicomObject, PrimitiveValue, Value, Tag, VR};
+use pulsedcm_core::{FileDicomObject, InMemDicomObject, PrimitiveValue, Value, Tag, VR, Result};
 use phf::*;
 use smallvec::smallvec;
 
@@ -62,14 +62,16 @@ fn dummy_from_vr(vr: &VR) -> PrimitiveValue{
         _ => PrimitiveValue::Empty,    
     }
 }
+
 impl ActionCode {
-    pub fn process(&self, data: &mut InMemDicomObject, tag: &Tag, vr: &VR) {
+    pub fn process(&self, data: &mut InMemDicomObject, tag: &Tag, vr: &VR) -> Result<FileDicomObject<InMemDicomObject>>  {
         match self {
             Self::D => {
                 // Replace with dummy value consistent with the VR
                 data.update_value_at(*tag, |v|{
                     *v.primitive_mut().unwrap() = dummy_from_vr(vr);
-                });
+                })?;
+                Ok(data)
             }, 
             Self::Z => {
 
