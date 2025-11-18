@@ -105,7 +105,9 @@ impl ActionCode {
             // },
             _ => {
                 data.update_value_at(*tag, |v|{
-                    *v.primitive_mut().unwrap() = dummy_from_vr(vr);
+                    if let Some(val) =  v.primitive_mut() {
+                        *val = dummy_from_vr(vr);
+                    };
                 })?;
                 Ok(())
             }

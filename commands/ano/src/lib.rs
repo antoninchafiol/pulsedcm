@@ -15,21 +15,25 @@ pub fn threading_handling(
     verbose: bool, 
     ) -> Result<()> {
     
+    println!("Dry?: {}", dry);
     let thread_pool = rayon::ThreadPoolBuilder::new()
         .num_threads(jobs)
         .build()?;
 
-    if let Some(first) = files.first(){
+    if let Some((first, rest)) = files.split_first(){
+        if *dry {
             single_thread_process(first.into(), &mut output_path.clone(),verbose ,dry, with_pixel_data)?;
-            *dry = false;
-    }
-    let _ = thread_pool.install(|| {
-        let _ = files.par_iter().try_for_each(
-            |file: &PathBuf| -> Result<()> {
-                single_thread_process(file.into(), &mut output_path.clone(), verbose , dry, with_pixel_data)?;
-                Ok(())
+        }
+        *dry = false;
+
+        let _ = thread_pool.install(|| {
+            let _ = rest.par_iter().try_for_each(
+                |file: &PathBuf| -> Result<()> {
+                    single_thread_process(file.into(), &mut output_path.clone(), verbose , dry, with_pixel_data)?;
+                    Ok(())
+                });
         });
-    });
+    }
 
     Ok(())
 }
@@ -50,7 +54,7 @@ pub fn single_thread_process(
         print_tags(&data);
         return Ok(());
     }
-
+    println!("testing, {}", dry);
     let filename = input_path.file_name().unwrap_or_default();
 
     // Case where out is not specified
