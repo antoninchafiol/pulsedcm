@@ -17,6 +17,10 @@ pub struct AnoArgs {
     #[arg(short, long, default_value= "false")]
     dry: bool,
 
+    /// Read now include PixelData and tags past it 
+    /// Otherwise it'd stop before PixelData
+    #[arg(long)]
+    with_pixel_data: bool,
 } 
 
 impl ArgRun for AnoArgs {
@@ -32,6 +36,7 @@ impl ArgRun for AnoArgs {
                 default_out_path
             }),
             &mut dry_arg, 
+            self.with_pixel_data,
             jobs,
             verbose,
         ){

@@ -1,4 +1,4 @@
-use std::{ path::PathBuf};
+use std::{ os::unix::fs::OpenOptionsExt, path::PathBuf};
 
 pub mod models;
 // pub use models;
@@ -10,6 +10,7 @@ pub fn threading_handling(
     files: Vec<PathBuf>, 
     output_path: PathBuf,
     dry: &mut bool, 
+    with_pixel_data: bool,
     jobs: usize,
     verbose: bool, 
     ) -> Result<()> {
@@ -19,13 +20,13 @@ pub fn threading_handling(
         .build()?;
 
     if let Some(first) = files.first(){
-            single_thread_process(first.into(), &mut output_path.clone(), verbose , dry)?;
+            single_thread_process(first.into(), &mut output_path.clone(),verbose ,dry, with_pixel_data)?;
             *dry = false;
     }
     let _ = thread_pool.install(|| {
         let _ = files.par_iter().try_for_each(
             |file: &PathBuf| -> Result<()> {
-                single_thread_process(file.into(), &mut output_path.clone(), verbose , dry)?;
+                single_thread_process(file.into(), &mut output_path.clone(), verbose , dry, with_pixel_data)?;
                 Ok(())
         });
     });
@@ -38,12 +39,14 @@ pub fn single_thread_process(
     output_path: &mut PathBuf,
     verbose: bool,
     dry: &bool,
+    with_pixel_data: bool
 ) -> Result<()> {
+    let data = de_identify_file(input_path.clone(), with_pixel_data, verbose)?; 
+
     if *dry {
         if verbose {
             println!("Launching a dry run");
         }
-        let data = de_identify_file(input_path,verbose)?;
         print_tags(&data);
         return Ok(());
     }
@@ -54,7 +57,6 @@ pub fn single_thread_process(
     if input_path.to_str().unwrap_or_default() == output_path.as_os_str().to_str().unwrap_or_default() {
         if ask_yes_no("? No output_path specified confirm to overwrite actual files") {
             output_path.push(filename);
-            let data = de_identify_file(input_path,verbose)?;
             data.write_to_file(&output_path)?;
         } else {
             println!("Stopping...");
@@ -66,8 +68,6 @@ pub fn single_thread_process(
             return Ok(());
         }
         output_path.push(filename);
-
-        let data = de_identify_file(input_path,verbose)?;
         data.write_to_file(&output_path)?;
     }
     Ok(())
@@ -77,9 +77,17 @@ fn de_identify_file (
     file_path: PathBuf, 
     // profile: Profile :TODO: Later implement the profile to match the right 
     // one in policyAction
+    with_pixel_data: bool,
     verbose: bool
 ) -> Result<FileDicomObject<InMemDicomObject>> {
-    let mut data = open_file(file_path)?;
+    
+    let mut data = if !with_pixel_data {
+        OpenFileOptions::new()
+            .read_until(dicom_dictionary_std::tags::PIXEL_DATA)
+            .open_file(file_path)?
+    } else {
+        open_file(file_path)?
+    };
 
     for (key, value) in DEID_HASH.entries() {
         let rec_tag: Tag = Tag{0: key.0, 1:key.1};
