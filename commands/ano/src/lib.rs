@@ -44,22 +44,7 @@ pub fn single_thread_process(
             println!("Launching a dry run");
         }
         let data = de_identify_file(input_path,verbose)?;
-
-        for element in data.into_iter() {
-            let tag: Tag = element.header().tag;
-            let vr = element.header().vr();
-            let name = StandardDataDictionary
-                .by_tag(tag)
-                .map(|entry| entry.alias)
-                .unwrap_or_else(|| "Unknown");
-            let value: String = element
-                .value()
-                .to_str()
-                .map(|cow| cow.into_owned())
-                .unwrap_or_else(|_| "[Binary]".to_string());
-            let mut s = String::new();
-            print_colorize(tag, vr.to_string(), value.as_str(), name, &mut s);
-        }
+        print_tags(&data);
         return Ok(());
     }
 

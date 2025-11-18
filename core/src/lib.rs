@@ -110,6 +110,25 @@ pub fn ask_yes_no(question: &str) -> bool {
     matches!(input.trim().to_lowercase().as_str(), "y" | "yes")
 }
 
+
+pub fn print_tags(data: &FileDicomObject<InMemDicomObject>){
+    for element in data.into_iter() {
+        let tag: Tag = element.header().tag;
+        let vr = element.header().vr();
+        let name = StandardDataDictionary
+            .by_tag(tag)
+            .map(|entry| entry.alias)
+            .unwrap_or_else(|| "Unknown");
+        let value: String = element
+            .value()
+            .to_str()
+            .map(|cow| cow.into_owned())
+            .unwrap_or_else(|_| "[Binary]".to_string());
+        let mut s = String::new();
+        print_colorize(tag, vr.to_string(), value.as_str(), name, &mut s);
+    }
+}
+
 pub fn print_colorize(tag: Tag, vr: &str, value: &str, name: &str, out_string: &mut String) {
     let color = if is_phi_tag(tag) {
         "\x1b[1;91m" // Red
