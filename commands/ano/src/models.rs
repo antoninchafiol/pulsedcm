@@ -2,6 +2,7 @@ use pulsedcm_core::{FileDicomObject, InMemDicomObject, PrimitiveValue, Value, Ta
 use phf::*;
 use smallvec::smallvec;
 
+#[derive(PartialEq, Eq)]
 pub enum ActionCode {
     D,       // Replace with dummy value
     Z,       // Zero-length or dummy
@@ -90,19 +91,12 @@ impl ActionCode {
                 Ok(())
 
             },
-            // Self::K => {
-            //     // Keep non SQ and de-identify SQ
-            //     data.update_value_at(*tag, |&mut v| -> Result<()>{
-            //         if *vr == VR::SQ{
-            //             if let Value::Sequence(ref mut items) = v {
-            //                 for i in items.items_mut() {
-            //                     Self::process(&self, i, tag, vr)?;
-            //                 }
-            //             }
-            //         }
-            //     })?;
-            //     Ok(())
-            // },
+            Self::K => {
+                if *vr == VR::SQ {
+                    self.recursive_process_sequence(data, tag, vr);
+                } 
+                Ok(())
+            },
             _ => {
                 data.update_value_at(*tag, |v|{
                     if let Some(val) =  v.primitive_mut() {
@@ -120,6 +114,30 @@ impl ActionCode {
             // Self::XZU => {},
         }
     }
+
+    pub fn recursive_process_sequence(&self, value: &mut InMemDicomObject, tag: &Tag, vr: &VR) {
+        let _ = value.update_value_at(*tag, |val|{
+            if let Some(items) = val.items_mut() {
+                for item in items {
+                    let child_tag_vr: Vec<(Tag, VR)> = item
+                        .iter()
+                        .map(|e| (e.header().tag, e.header().vr))
+                        .collect();
+                    for (child_tag, child_vr) in child_tag_vr {
+
+                        if let Some(child) = DEID_HASH.get(&(child_tag.0, child_tag.1)) {
+                            // Check if the child's VR is SQ so it can be returned recursively
+                            if child_vr == VR::SQ && child.basic == ActionCode::K {
+                                self.recursive_process_sequence(item, &child_tag, &child_vr);
+                            } else { 
+                                child.basic.process(item, &child_tag, &child_vr);
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
 }
 
 pub struct PolicyAction{
@@ -136,7 +154,6 @@ pub struct PolicyAction{
     pub cln_graph: Option<ActionCode>, // Clean Graphics
 }
 
-const ALL_TAGS: usize = 642; // Should be 649 if taking every single parts of chapter E
 pub static DEID_HASH: phf::Map<(u16, u16), PolicyAction> = phf_map!{
     (0x0000,0x1000) => PolicyAction{basic:ActionCode::X,ret_sf_priv:None,ret_uids:Some(ActionCode::K),ret_dev_id:None,ret_inst_id:None,ret_pt_char:None,ret_lg_full_dt:None,ret_lg_mod_dt:None,cln_desc:None,cln_struc_cnt:None,cln_graph:None},
     (0x0000,0x1001) => PolicyAction{basic:ActionCode::U,ret_sf_priv:None,ret_uids:Some(ActionCode::K),ret_dev_id:None,ret_inst_id:None,ret_pt_char:None,ret_lg_full_dt:None,ret_lg_mod_dt:None,cln_desc:None,cln_struc_cnt:None,cln_graph:None},

@@ -23,32 +23,7 @@ pub use errors::{PulseError, PulseErrorKind};
 
 pub type Result<T> = std::result::Result<T, PulseError>;
 
-pub fn list_all_files(user_path: &str) -> Result<Vec<String>> {
-    if !PathBuf::from(user_path).exists() {
-        return Err(errors::PulseError::new(
-                errors::PulseErrorKind::IO(
-                    io::Error::new(io::ErrorKind::NotFound, "IO Operation failed")
-                ), "Provided file/folder doesn't exist"));
-    }
-
-    let mut res: Vec<String> = Vec::new();
-
-    for entry in WalkDir::new(user_path)
-        .into_iter()
-        .filter_map(|e| e.ok())
-        .filter(|e| {
-            e.path()
-                .extension()
-                .and_then(|e| e.to_str())
-                .map(|e| e.eq_ignore_ascii_case("dcm"))
-                .unwrap_or(false)
-        })
-    {
-        res.push(entry.path().to_str().unwrap().to_string());
-    }
-    Ok(res)
-}
-
+/// List all dcm files recursively from the given path 
 pub fn collect_dicom_files(user_path: &str) -> Result<Vec<PathBuf>> {
     if !PathBuf::from(user_path).exists() {
         return Err(errors::PulseError::new(
@@ -75,6 +50,7 @@ pub fn collect_dicom_files(user_path: &str) -> Result<Vec<PathBuf>> {
     Ok(res)
 }
 
+/// The structure of the data outputed in JSON/CSV
 #[derive(Serialize)]
 pub struct SerializableDicomEntry {
     pub filename: String,
@@ -84,6 +60,8 @@ pub struct SerializableDicomEntry {
     pub value: String,
 }
 
+/// Allow to determine what's the optimum number of jobs
+// TODO: Rewrite
 pub fn jobs_handling(jobs: Option<usize>, max_file: usize) -> usize {
     let j = jobs.unwrap_or_else(|| {
         return 1;
@@ -100,6 +78,7 @@ pub fn jobs_handling(jobs: Option<usize>, max_file: usize) -> usize {
     }
 }
 
+/// Prompt a "yes or no" question to the user
 pub fn ask_yes_no(question: &str) -> bool {
     print!("{} Y/N: ", question);
     let _ = io::stdout().flush();
@@ -110,7 +89,7 @@ pub fn ask_yes_no(question: &str) -> bool {
     matches!(input.trim().to_lowercase().as_str(), "y" | "yes")
 }
 
-
+/// From the given data object, print all the tags
 pub fn print_tags(data: &FileDicomObject<InMemDicomObject>){
     for element in data.into_iter() {
         let tag: Tag = element.header().tag;
@@ -129,6 +108,7 @@ pub fn print_tags(data: &FileDicomObject<InMemDicomObject>){
     }
 }
 
+/// Print the tag with expected values and colours
 pub fn print_colorize(tag: Tag, vr: &str, value: &str, name: &str, out_string: &mut String) {
     let color = if is_phi_tag(tag) {
         "\x1b[1;91m" // Red
@@ -169,6 +149,7 @@ pub fn print_colorize(tag: Tag, vr: &str, value: &str, name: &str, out_string: &
     }
 }
 
+/// Returns true if the Tag is amongst the PHI tags
 fn is_phi_tag(tag: Tag) -> bool {
     matches!(
         tag,
@@ -190,6 +171,7 @@ fn is_phi_tag(tag: Tag) -> bool {
     )
 }
 
+/// Returns true if the taf is important 
 fn is_warning_tag(tag: Tag) -> bool {
     matches!(
         tag,
@@ -210,6 +192,8 @@ fn is_warning_tag(tag: Tag) -> bool {
     )
 }
 
+
+/// Handle the png output for the files
 pub fn output_handling(input_path: &PathBuf, output_path: &mut PathBuf) -> Result<()>{
     // Check if output_path exists (and create a folder if not )
     if !output_path.exists() {

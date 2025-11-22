@@ -1,4 +1,4 @@
-use std::{ os::unix::fs::OpenOptionsExt, path::PathBuf};
+use std::{path::PathBuf};
 
 pub mod models;
 // pub use models;
@@ -92,6 +92,8 @@ fn de_identify_file (
     } else {
         open_file(file_path)?
     };
+    // let metadata = data.meta();
+    // let mut data = data.into_inner();
 
     for (key, value) in DEID_HASH.entries() {
         let rec_tag: Tag = Tag{0: key.0, 1:key.1};
