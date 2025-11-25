@@ -1,6 +1,7 @@
-use std::{path::PathBuf};
+use std::{path::PathBuf, sync::Arc};
 use pulsedcm_core::*;
 use uuid::Uuid;
+use dashmap::DashMap; 
 
 pub mod models;
 
@@ -18,6 +19,7 @@ pub fn threading_handling(
         .num_threads(jobs)
         .build()?;
 
+    let uid_map : Arc<DashMap<String, String>> = Arc::new(DashMap::new());
     let u = format!("2.25.{}",Uuid::new_v4().to_u128_le());
     let uid = u.as_str();
 
@@ -31,6 +33,7 @@ pub fn threading_handling(
         let _ = thread_pool.install(|| {
             let _ = rest.par_iter().try_for_each(
                 |file: &PathBuf| -> Result<()> {
+                    let uid_map = Arc::clone(&uid_map);
                     single_thread_process(file.into(), &mut output_path.clone(), verbose , dry, with_pixel_data, uid)?;
                     Ok(())
                 });
