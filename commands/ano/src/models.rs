@@ -1,6 +1,7 @@
 use pulsedcm_core::{FileDicomObject, InMemDicomObject, PrimitiveValue, Value, Tag, VR, Result};
 use phf::*;
 use smallvec::smallvec;
+use uuid::Uuid;
 
 #[derive(PartialEq, Eq)]
 pub enum ActionCode {
@@ -65,7 +66,7 @@ fn dummy_from_vr(vr: &VR) -> PrimitiveValue{
 }
 
 impl ActionCode {
-    pub fn process(&self, data: &mut InMemDicomObject, tag: &Tag, vr: &VR) -> Result<()>  {
+    pub fn process(&self, data: &mut InMemDicomObject, tag: &Tag, vr: &VR, uid: &str) -> Result<()>  {
         match self {
             Self::D => {
                 // Replace with dummy value consistent with the VR
@@ -93,8 +94,15 @@ impl ActionCode {
             },
             Self::K => {
                 if *vr == VR::SQ {
-                    self.recursive_process_sequence(data, tag, vr);
+                    self.recursive_process_sequence(data, tag, vr, uid);
                 } 
+                Ok(())
+            },
+            Self::U => {
+                // Replace with a same UID compiled at the thread handling time
+                data.update_value_at(*tag, |v|{
+                    *v.primitive_mut().unwrap() = PrimitiveValue::from(uid);
+                })?;
                 Ok(())
             },
             _ => {
@@ -106,7 +114,6 @@ impl ActionCode {
                 Ok(())
             }
             // Self::C => {},
-            // Self::U => {},
             // Self::ZD => {},
             // Self::XZ => {},
             // Self::XD => {},
@@ -115,7 +122,7 @@ impl ActionCode {
         }
     }
 
-    pub fn recursive_process_sequence(&self, value: &mut InMemDicomObject, tag: &Tag, vr: &VR) {
+    pub fn recursive_process_sequence(&self, value: &mut InMemDicomObject, tag: &Tag, vr: &VR, uid: &str) {
         let _ = value.update_value_at(*tag, |val|{
             if let Some(items) = val.items_mut() {
                 for item in items {
@@ -128,9 +135,9 @@ impl ActionCode {
                         if let Some(child) = DEID_HASH.get(&(child_tag.0, child_tag.1)) {
                             // Check if the child's VR is SQ so it can be returned recursively
                             if child_vr == VR::SQ && child.basic == ActionCode::K {
-                                self.recursive_process_sequence(item, &child_tag, &child_vr);
+                                self.recursive_process_sequence(item, &child_tag, &child_vr, uid);
                             } else { 
-                                child.basic.process(item, &child_tag, &child_vr);
+                                child.basic.process(item, &child_tag, &child_vr, uid);
                             }
                         }
                     }

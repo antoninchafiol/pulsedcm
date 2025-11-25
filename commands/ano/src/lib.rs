@@ -1,8 +1,8 @@
 use std::{path::PathBuf};
+use pulsedcm_core::*;
+use uuid::Uuid;
 
 pub mod models;
-// pub use models;
-use pulsedcm_core::*;
 
 use crate::models::DEID_HASH;
 
@@ -14,22 +14,24 @@ pub fn threading_handling(
     jobs: usize,
     verbose: bool, 
     ) -> Result<()> {
-    
-    println!("Dry?: {}", dry);
     let thread_pool = rayon::ThreadPoolBuilder::new()
         .num_threads(jobs)
         .build()?;
 
+    let u = format!("2.25.{}",Uuid::new_v4().to_u128_le());
+    let uid = u.as_str();
+
+
     if let Some((first, rest)) = files.split_first(){
         if *dry {
-            single_thread_process(first.into(), &mut output_path.clone(),verbose ,dry, with_pixel_data)?;
+            single_thread_process(first.into(), &mut output_path.clone(),verbose ,dry, with_pixel_data, uid)?;
         }
         *dry = false;
 
         let _ = thread_pool.install(|| {
             let _ = rest.par_iter().try_for_each(
                 |file: &PathBuf| -> Result<()> {
-                    single_thread_process(file.into(), &mut output_path.clone(), verbose , dry, with_pixel_data)?;
+                    single_thread_process(file.into(), &mut output_path.clone(), verbose , dry, with_pixel_data, uid)?;
                     Ok(())
                 });
         });
@@ -43,9 +45,10 @@ pub fn single_thread_process(
     output_path: &mut PathBuf,
     verbose: bool,
     dry: &bool,
-    with_pixel_data: bool
+    with_pixel_data: bool, 
+    uid: &str
 ) -> Result<()> {
-    let data = de_identify_file(input_path.clone(), with_pixel_data, verbose)?; 
+    let data = de_identify_file(input_path.clone(), with_pixel_data, verbose, uid)?; 
 
     if *dry {
         if verbose {
@@ -54,7 +57,6 @@ pub fn single_thread_process(
         print_tags(&data);
         return Ok(());
     }
-    println!("testing, {}", dry);
     let filename = input_path.file_name().unwrap_or_default();
 
     // Case where out is not specified
@@ -82,7 +84,8 @@ fn de_identify_file (
     // profile: Profile :TODO: Later implement the profile to match the right 
     // one in policyAction
     with_pixel_data: bool,
-    verbose: bool
+    verbose: bool,
+    uid: &str
 ) -> Result<FileDicomObject<InMemDicomObject>> {
     
     let mut data = if !with_pixel_data {
@@ -100,7 +103,7 @@ fn de_identify_file (
         // Check if in 
         if let Ok(elem) = data.element(rec_tag) {
             let vr = elem.vr();
-            value.basic.process(&mut data, &rec_tag, &vr)?;
+            value.basic.process(&mut data, &rec_tag, &vr, uid)?;
         } else {
             continue;
         }
