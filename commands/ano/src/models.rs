@@ -1,3 +1,5 @@
+use std::sync::Arc;
+use dashmap::DashMap;
 use pulsedcm_core::{FileDicomObject, InMemDicomObject, PrimitiveValue, Value, Tag, VR, Result};
 use phf::*;
 use smallvec::smallvec;
@@ -66,7 +68,12 @@ fn dummy_from_vr(vr: &VR) -> PrimitiveValue{
 }
 
 impl ActionCode {
-    pub fn process(&self, data: &mut InMemDicomObject, tag: &Tag, vr: &VR, uid: &str) -> Result<()>  {
+    pub fn process(&self, 
+        data: &mut InMemDicomObject, 
+        tag: &Tag, 
+        vr: &VR, 
+        uid_map: &Arc<DashMap<String, String>>
+    ) -> Result<()>  {
         match self {
             Self::D => {
                 // Replace with dummy value consistent with the VR
@@ -94,16 +101,47 @@ impl ActionCode {
             },
             Self::K => {
                 if *vr == VR::SQ {
-                    self.recursive_process_sequence(data, tag, vr, uid);
+                    self.recursive_process_sequence(data, tag, vr, uid_map);
                 } 
                 Ok(())
             },
             Self::U => {
+                if let Ok(old_val) = data.value_at(*tag){
+                    if let Some(old_val) = old_val.primitive(){
+                        // Get the final String 
+                        let old_val = old_val.to_string();
+
+                        // Check if it's contained within the map
+                        if let Some(uid_match) = uid_map.get(&old_val) {
+                            // Found the right entry / replacing the current UID with the generated
+                            // one from the uid map
+                            println!("{:?}", uid_match);
+                            data.update_value_at(*tag, |v|{
+                                // I'm not using an "if let" statement here as 
+
+                                *v.primitive_mut().unwrap() = PrimitiveValue::from(uid_match.value().as_str());
+                            })?;
+                        } else {
+                            // Generate a new UUID 
+                            let new_generated_uid = format!("2.25.{}", Uuid::new_v4().to_u128_le());
+                            // Change the current field to the new one
+                            data.update_value_at(*tag, |v|{
+                                *v.primitive_mut().unwrap() = PrimitiveValue::from(new_generated_uid.clone());
+                            })?;
+                            // Add the change to the hashmap
+                            uid_map.insert(old_val, new_generated_uid);
+
+                        }
+
+
+                    }
+                }
+                Ok(())                
                 // Replace with a same UID compiled at the thread handling time
-                data.update_value_at(*tag, |v|{
-                    *v.primitive_mut().unwrap() = PrimitiveValue::from(uid);
-                })?;
-                Ok(())
+                // data.update_value_at(*tag, |v|{
+                //     *v.primitive_mut().unwrap() = PrimitiveValue::from(uid);
+                // })?;
+                // Ok(())
             },
             _ => {
                 data.update_value_at(*tag, |v|{
@@ -122,7 +160,11 @@ impl ActionCode {
         }
     }
 
-    pub fn recursive_process_sequence(&self, value: &mut InMemDicomObject, tag: &Tag, vr: &VR, uid: &str) {
+    pub fn recursive_process_sequence(&self, 
+        value: &mut InMemDicomObject, 
+        tag: &Tag, 
+        vr: &VR, 
+        uid_map: &Arc<DashMap<String, String>>) {
         let _ = value.update_value_at(*tag, |val|{
             if let Some(items) = val.items_mut() {
                 for item in items {
@@ -135,9 +177,9 @@ impl ActionCode {
                         if let Some(child) = DEID_HASH.get(&(child_tag.0, child_tag.1)) {
                             // Check if the child's VR is SQ so it can be returned recursively
                             if child_vr == VR::SQ && child.basic == ActionCode::K {
-                                self.recursive_process_sequence(item, &child_tag, &child_vr, uid);
+                                self.recursive_process_sequence(item, &child_tag, &child_vr, uid_map);
                             } else { 
-                                child.basic.process(item, &child_tag, &child_vr, uid);
+                                child.basic.process(item, &child_tag, &child_vr, uid_map);
                             }
                         }
                     }
@@ -146,6 +188,19 @@ impl ActionCode {
         });
     }
 }
+
+// pub fn update_value_from_uid_map(
+//     data: &mut InMemDicomObject, 
+//     tag: &Tag, 
+//     uid_map: &Arc<DashMap<String, String>>:w
+// ){
+//     // Check for the value
+//     if let Ok(old_val) = data.value_at(*tag){
+//         println!("{}", old_val);
+//     }
+//     // let old_value = data.get(tag).is_so
+//     // if uid_map.get(key)
+// }
 
 pub struct PolicyAction{
     pub basic: ActionCode,  // Basic profile

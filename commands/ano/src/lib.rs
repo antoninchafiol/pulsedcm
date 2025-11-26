@@ -19,14 +19,13 @@ pub fn threading_handling(
         .num_threads(jobs)
         .build()?;
 
+    // Setup the hasmap 
+    // TODO: Might need a better way to hashmap it
     let uid_map : Arc<DashMap<String, String>> = Arc::new(DashMap::new());
-    let u = format!("2.25.{}",Uuid::new_v4().to_u128_le());
-    let uid = u.as_str();
-
 
     if let Some((first, rest)) = files.split_first(){
         if *dry {
-            single_thread_process(first.into(), &mut output_path.clone(),verbose ,dry, with_pixel_data, uid)?;
+            single_thread_process(first.into(), &mut output_path.clone(),verbose ,dry, with_pixel_data, &uid_map)?;
         }
         *dry = false;
 
@@ -34,7 +33,7 @@ pub fn threading_handling(
             let _ = rest.par_iter().try_for_each(
                 |file: &PathBuf| -> Result<()> {
                     let uid_map = Arc::clone(&uid_map);
-                    single_thread_process(file.into(), &mut output_path.clone(), verbose , dry, with_pixel_data, uid)?;
+                    single_thread_process(file.into(), &mut output_path.clone(), verbose , dry, with_pixel_data, &uid_map)?;
                     Ok(())
                 });
         });
@@ -49,9 +48,9 @@ pub fn single_thread_process(
     verbose: bool,
     dry: &bool,
     with_pixel_data: bool, 
-    uid: &str
+    uid_map: &Arc<DashMap<String, String>>
 ) -> Result<()> {
-    let data = de_identify_file(input_path.clone(), with_pixel_data, verbose, uid)?; 
+    let data = de_identify_file(input_path.clone(), with_pixel_data, verbose, uid_map)?; 
 
     if *dry {
         if verbose {
@@ -88,7 +87,7 @@ fn de_identify_file (
     // one in policyAction
     with_pixel_data: bool,
     verbose: bool,
-    uid: &str
+    uid_map: &Arc<DashMap<String, String>>
 ) -> Result<FileDicomObject<InMemDicomObject>> {
     
     let mut data = if !with_pixel_data {
@@ -106,7 +105,7 @@ fn de_identify_file (
         // Check if in 
         if let Ok(elem) = data.element(rec_tag) {
             let vr = elem.vr();
-            value.basic.process(&mut data, &rec_tag, &vr, uid)?;
+            value.basic.process(&mut data, &rec_tag, &vr, uid_map)?;
         } else {
             continue;
         }
