@@ -5,6 +5,58 @@ use phf::*;
 use smallvec::smallvec;
 use uuid::Uuid;
 
+
+// ---------- Performance branch -----------------
+pub enum Action {
+    Empty,
+    Remove, 
+    ReplaceDummy,
+    ReplaceUID,
+    Keep,
+    Zero,
+}
+
+pub static DEID_MAP: phf::Map<(u16, u16), Action> = phf_map!{
+    (0x0010, 0x0010) => Action::Remove,       // PatientName
+    (0x0010, 0x0020) => Action::Remove,       // PatientID
+    (0x0010, 0x0030) => Action::Empty,        // PatientBirthDate
+    (0x0008, 0x0020) => Action::Empty,        // StudyDate
+    (0x0008, 0x0030) => Action::Empty,        // StudyTime
+    (0x0020, 0x000D) => Action::ReplaceUID,   // StudyInstanceUID
+    (0x0020, 0x000E) => Action::ReplaceUID,   // SeriesInstanceUID
+    (0x0008, 0x0018) => Action::ReplaceUID,   // SOPInstanceUID
+    (0x0008, 0x0080) => Action::Empty,        // InstitutionName
+    (0x0008, 0x0050) => Action::Empty,        // AccessionNumber
+    (0x0008, 0x0090) => Action::Remove,       // Referring Physician
+    (0x0008, 0x1030) => Action::Empty,        // StudyDescription
+    (0x0018, 0x1000) => Action::Empty,        // DeviceSerialNumber
+};
+
+impl Action {
+    pub fn apply(&self, data: &mut InMemDicomObject, tag: &(u16, u16), uid_map: &Arc<DashMap<String, String>>) {
+        match self {
+            Action::Empty        => {
+                
+            },
+            Action::Remove       => {},
+            Action::ReplaceDummy => {},
+            Action::ReplaceUID   => {},
+            Action::Keep         => {},
+            Action::Zero         => {},
+
+        }
+    }
+    pub fn apply_inmemobject(&self, data: &mut InMemDicomObject, tag: &(u16, u16) ,uid_map: &mut DashMap<String, String>) {
+        
+    }
+}
+
+
+// --------- Clinical Branch ---------
+
+
+
+
 #[derive(PartialEq, Eq)]
 pub enum ActionCode {
     D,       // Replace with dummy value
@@ -188,19 +240,6 @@ impl ActionCode {
         });
     }
 }
-
-// pub fn update_value_from_uid_map(
-//     data: &mut InMemDicomObject, 
-//     tag: &Tag, 
-//     uid_map: &Arc<DashMap<String, String>>:w
-// ){
-//     // Check for the value
-//     if let Ok(old_val) = data.value_at(*tag){
-//         println!("{}", old_val);
-//     }
-//     // let old_value = data.get(tag).is_so
-//     // if uid_map.get(key)
-// }
 
 pub struct PolicyAction{
     pub basic: ActionCode,  // Basic profile

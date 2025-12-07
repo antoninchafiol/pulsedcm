@@ -1,11 +1,11 @@
 use std::{path::PathBuf, sync::Arc};
 use pulsedcm_core::*;
-use uuid::Uuid;
 use dashmap::DashMap; 
 
 pub mod models;
+pub mod iod;
 
-use crate::models::DEID_HASH;
+use crate::models::{DEID_HASH, DEID_MAP};
 
 pub fn threading_handling(
     files: Vec<PathBuf>, 
@@ -100,6 +100,22 @@ fn de_identify_file (
     // let metadata = data.meta();
     // let mut data = data.into_inner();
 
+    for t in data.tags() {
+        if let Some(el) = data.get(t){
+            if el.header().vr == VR::SQ {
+                // Rebuild and recurse
+            }
+            if let Some(oui) = DEID_MAP.get((t.0, t.1)){
+                oui.apply(data, tag, vr, uid_map);
+            }
+        }
+
+    }
+    
+
+
+
+
     for (key, value) in DEID_HASH.entries() {
         let rec_tag: Tag = Tag{0: key.0, 1:key.1};
         // Check if in 
@@ -127,4 +143,35 @@ fn de_identify_file (
 
 
 
+}
+
+
+fn de_identify(
+    data: &mut InMemDicomObject, 
+    uid_map: &Arc<DashMap<String, String>>,
+) {
+    let tags: Vec<Tag> = data.tags().collect();
+    for tag in tags {
+        let vr = data.get(tag).unwrap().vr();
+        // Get all tags and retrieve the VR from it 
+            match vr {
+                VR::SQ => {
+                    let _ = data.update_value_at(tag, |val| {
+                    // If a Sequence, Rebuild a InMemDicomObject from it and recurse
+                    if let Some(items) = val.items_mut() {
+                        for item in items {
+                            de_identify(item, uid_map);
+                        }
+                    }
+                    });
+                },
+                _ => {
+                    // If not a sequence, check if we have the attribute/tag within our policy hashmap
+                    let tag_tuple = (tag.0, tag.1);
+                    if let Some(policy_action) = DEID_MAP.get(&tag_tuple){
+                        policy_action.apply(data, &tag_tuple, uid_map);
+                    }
+                },
+            }
+    }
 }
