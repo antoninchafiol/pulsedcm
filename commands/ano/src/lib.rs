@@ -3,7 +3,6 @@ use pulsedcm_core::*;
 use dashmap::DashMap; 
 
 pub mod models;
-pub mod iod;
 
 use crate::models::{DEID_MAP};
 
@@ -14,6 +13,7 @@ pub fn threading_handling(
     with_pixel_data: bool,
     jobs: usize,
     verbose: bool, 
+    uid_to_hash: &bool
     ) -> Result<()> {
     let thread_pool = rayon::ThreadPoolBuilder::new()
         .num_threads(jobs)
@@ -25,7 +25,7 @@ pub fn threading_handling(
 
     if let Some((first, rest)) = files.split_first(){
         if *dry {
-            single_thread_process(first.into(), &mut output_path.clone(),verbose ,dry, with_pixel_data, &uid_map)?;
+            single_thread_process(first.into(), &mut output_path.clone(),verbose ,dry, with_pixel_data, &uid_map, uid_to_hash)?;
         }
         *dry = false;
 
@@ -33,7 +33,7 @@ pub fn threading_handling(
             let _ = rest.par_iter().try_for_each(
                 |file: &PathBuf| -> Result<()> {
                     let uid_map = Arc::clone(&uid_map);
-                    single_thread_process(file.into(), &mut output_path.clone(), verbose , dry, with_pixel_data, &uid_map)?;
+                    single_thread_process(file.into(), &mut output_path.clone(), verbose , dry, with_pixel_data, &uid_map, uid_to_hash)?;
                     Ok(())
                 });
         });
@@ -48,7 +48,8 @@ pub fn single_thread_process(
     verbose: bool,
     dry: &bool,
     with_pixel_data: bool, 
-    uid_map: &Arc<DashMap<String, String>>
+    uid_map: &Arc<DashMap<String, String>>,
+    uid_to_hash: &bool
 ) -> Result<()> {
     let mut data = if !with_pixel_data {
         OpenFileOptions::new()
@@ -59,7 +60,7 @@ pub fn single_thread_process(
     };
     
     // TODO: Check result
-    let process_result = de_identify(&mut data, uid_map);
+    let process_result = de_identify(&mut data, uid_map, uid_to_hash);
 
     // let data = de_identify_file(input_path.clone(), with_pixel_data, verbose, uid_map)?; 
 
@@ -95,6 +96,7 @@ pub fn single_thread_process(
 fn de_identify(
     data: &mut InMemDicomObject, 
     uid_map: &Arc<DashMap<String, String>>,
+    uid_to_hash: &bool
 ) -> Result<()> {
     let tags: Vec<Tag> = data.tags().collect();
     for tag in tags {
@@ -107,10 +109,10 @@ fn de_identify(
                     let _ = data.update_value_at(tag, |val| {
                     if let Some(items) = val.items_mut() {
                         for item in items {
-                            de_identify(item, uid_map);
+                            de_identify(item, uid_map, uid_to_hash);
                         }
                     }
-                    });
+                    })?;
                 },
                 // If not a sequence, check if we have the attribute/tag within our policy hashmap
                 _ => {
@@ -118,7 +120,7 @@ fn de_identify(
                     let compressed_tag: u32 = ((tag.0 as u32) << 16) + tag.1 as u32;
                     
                     if let Some(policy_action) = DEID_MAP.get(&compressed_tag){
-                        policy_action.apply(data, &compressed_tag, &vr, uid_map);
+                        policy_action.apply(data, &compressed_tag, &vr, uid_map, uid_to_hash)?;
                     }
                 },
             }

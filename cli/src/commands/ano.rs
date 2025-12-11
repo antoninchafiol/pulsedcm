@@ -21,6 +21,10 @@ pub struct AnoArgs {
     /// Otherwise it'd stop before PixelData
     #[arg(long)]
     with_pixel_data: bool,
+
+    /// Determine if we hash the UID or preserve UID as requested in Chapter E
+    #[arg(short, long)]
+    uid_hash: bool, 
 } 
 
 impl ArgRun for AnoArgs {
@@ -39,6 +43,7 @@ impl ArgRun for AnoArgs {
             self.with_pixel_data,
             jobs,
             verbose,
+            &self.uid_hash,
         ){
             Ok(_) => {},
             Err(e) => {
