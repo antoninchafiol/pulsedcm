@@ -12,6 +12,11 @@ pub struct AnoArgs {
     #[arg(long)]
     out: Option<PathBuf>,
 
+    #[arg(short, long, default_value_t = 1)]
+    workers: usize,
+
+    #[arg(short, long, default_value_t = 1)]
+    batch: usize,
     /// Show the changed args for the file
     /// If multiple files it'll stop processing after the 1st to give an output
     #[arg(short, long, default_value= "false")]
@@ -42,6 +47,7 @@ impl ArgRun for AnoArgs {
             &mut dry_arg, 
             self.with_pixel_data,
             jobs,
+            self.batch,
             verbose,
             &self.uid_hash,
         ){

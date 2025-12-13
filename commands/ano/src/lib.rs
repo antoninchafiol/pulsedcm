@@ -11,12 +11,13 @@ pub fn threading_handling(
     output_path: PathBuf,
     dry: &mut bool, 
     with_pixel_data: bool,
-    jobs: usize,
+    workers: usize,
+    batch: usize,
     verbose: bool, 
     uid_to_hash: &bool
     ) -> Result<()> {
     let thread_pool = rayon::ThreadPoolBuilder::new()
-        .num_threads(jobs)
+        .num_threads(workers)
         .build()?;
 
     // Setup the hasmap 
@@ -28,15 +29,21 @@ pub fn threading_handling(
             single_thread_process(first.into(), &mut output_path.clone(),verbose ,dry, with_pixel_data, &uid_map, uid_to_hash)?;
         }
         *dry = false;
-
-        let _ = thread_pool.install(|| {
-            let _ = rest.par_iter().try_for_each(
-                |file: &PathBuf| -> Result<()> {
-                    let uid_map = Arc::clone(&uid_map);
-                    single_thread_process(file.into(), &mut output_path.clone(), verbose , dry, with_pixel_data, &uid_map, uid_to_hash)?;
-                    Ok(())
-                });
-        });
+        let chunks = if batch > 1 {
+            rest.chunks(batch).collect::<Vec<&[PathBuf]>>()
+        } else {
+            vec![rest]
+        };
+        for chunk in chunks {
+            let _ = thread_pool.install(|| {
+                let _ = chunk.par_iter().try_for_each(
+                    |file: &PathBuf| -> Result<()> {
+                        let uid_map = Arc::clone(&uid_map);
+                        single_thread_process(file.into(), &mut output_path.clone(), verbose , dry, with_pixel_data, &uid_map, uid_to_hash)?;
+                        Ok(())
+                    });
+            });
+        }
     }
 
     Ok(())
