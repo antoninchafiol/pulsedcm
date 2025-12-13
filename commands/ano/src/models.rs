@@ -30,6 +30,35 @@ pub static DEID_MAP: phf::Map<u32, Action> = phf_map!{
     0x00181000 => Action::Empty,        // DeviceSerialNumber
     0x0020000D => Action::ReplaceUID,   // StudyInstanceUID
     0x0020000E => Action::ReplaceUID,   // SeriesInstanceUID
+
+    // == Preservation of Image Metadata ==
+
+    0x00280002 => Action::Keep, // SamplesPerPixel
+    0x00280004 => Action::Keep, // PhotometricInterpretation
+    0x00280010 => Action::Keep, // Rows
+    0x00280011 => Action::Keep, // Columns
+    0x00280100 => Action::Keep, // BitsAllocated
+    0x00280101 => Action::Keep, // BitsStored
+    0x00280102 => Action::Keep, // HighBit
+    0x00280103 => Action::Keep, // PixelRepresentation
+    0x00281050 => Action::Keep, // WindowCenter
+    0x00281051 => Action::Keep, // WindowWidth
+    0x00281052 => Action::Keep, // RescaleIntercept
+    0x00281053 => Action::Keep, // RescaleSlope
+    0x00281054 => Action::Keep, // RescaleType
+    0x00180050 => Action::Keep, // SliceThickness
+    0x00180088 => Action::Keep, // SpacingBetweenSlices
+    0x00200032 => Action::Keep, // ImagePositionPatient
+    0x00200037 => Action::Keep, // ImageOrientationPatient
+    0x00280030 => Action::Keep, // PixelSpacing
+    0x00180060 => Action::Keep, // KVP
+    0x00181020 => Action::Keep, // ScanningSequence
+    0x00181021 => Action::Keep, // SequenceVariant
+    0x00181022 => Action::Keep, // ScanOptions
+    0x00181023 => Action::Keep, // MR Acquisition Type (if MR)
+    0x00180024 => Action::Keep, // SequenceName
+    0x00181050 => Action::Keep, // SliceThickness
+    0x00185000 => Action::Keep, // ProtocolName
 };
 
 impl Action {
