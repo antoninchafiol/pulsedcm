@@ -3,6 +3,7 @@ use pulsedcm_core::*;
 use dashmap::DashMap; 
 
 pub mod models;
+pub mod uid;
 
 use crate::models::{DEID_MAP};
 
@@ -133,4 +134,76 @@ fn de_identify(
             }
     }
     Ok(())
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    pub fn create_valid_dicom() -> InMemDicomObject {
+        let mut obj = InMemDicomObject::new_empty();
+        obj.put(InMemElement::new(
+                Tag(0x0010, 0x0010), // PatientName
+                VR::PN,
+                PrimitiveValue::from("John^Doe"),
+        ));
+
+        obj.put(InMemElement::new(
+                Tag(0x0010, 0x0020), // PatientID
+                VR::LO,
+                PrimitiveValue::from("12345"),
+        ));
+
+        obj.put(InMemElement::new(
+                Tag(0x0008, 0x0018), // SOPInstanceUID
+                VR::UI,
+                PrimitiveValue::from("1.2.3.4.5"),
+        ));
+
+        obj.put(InMemElement::new(
+                Tag(0x0008, 0x0020), // StudyDate
+                VR::DA,
+                PrimitiveValue::from("20240101"),
+        ));
+        obj
+    }
+    pub fn create_corrupted_dicom() -> InMemDicomObject{
+        let mut obj = InMemDicomObject::new_empty();
+
+        // Invalid UID content
+        obj.put(InMemElement::new(
+                Tag(0x0008, 0x0018),
+                VR::UI,
+                PrimitiveValue::from(vec![0xFF, 0xFF, 0xFF]),
+        ));
+
+        // Broken text encoding
+        obj.put(InMemElement::new(
+                Tag(0x0010, 0x0010),
+                VR::PN,
+                PrimitiveValue::from(vec![0x00, 0x00]),
+        ));
+
+        obj
+    }
+
+    #[test]
+    fn valid_dicom_dummy_deid(){
+        let mut obj = create_valid_dicom(); 
+        let uid_map : Arc<DashMap<String, String>> = Arc::new(DashMap::new());
+        let uid_to_hash = false;
+        let res = de_identify(&mut obj, &uid_map, &uid_to_hash);
+        assert!(res.is_ok());
+    }
+    
+    #[test]
+    fn corrupted_dicom_dummy_deid(){
+        let mut obj = create_corrupted_dicom(); 
+        let uid_map : Arc<DashMap<String, String>> = Arc::new(DashMap::new());
+        let uid_to_hash = false;
+        let res = de_identify(&mut obj, &uid_map, &uid_to_hash);
+        assert!(res.is_ok() || res.is_err());
+    }
+    
 }

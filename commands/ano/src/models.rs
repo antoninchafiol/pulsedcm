@@ -3,10 +3,8 @@ use dashmap::DashMap;
 use pulsedcm_core::{FileDicomObject, InMemDicomObject, PrimitiveValue, Value, Tag, VR, Result};
 use phf::*;
 use smallvec::smallvec;
-use uuid::Uuid;
-use sha2::{Sha256, Digest};
 
-
+use crate::uid::{*};
 // ---------- Performance branch -----------------
 pub enum Action {
     Empty,
@@ -137,19 +135,6 @@ impl Action {
     }
 }
 
-fn generate_uid() -> String {
-    format!("2.25.{}", Uuid::new_v4().to_u128_le())
-}
-
-fn hash_uid(val: &mut PrimitiveValue) -> String {
-    let digested = Sha256::digest(val.clone().to_bytes());
-    let mut bytes = [0u8; 16];
-    bytes.copy_from_slice(&digested[..16]);
-    let dec = u128::from_be_bytes(bytes).to_string();
-
-    format!("2.25.{}", dec)
-}
-
 fn dummy_from_vr(vr: &VR) -> PrimitiveValue{
     match vr {
         // String-like
@@ -197,3 +182,13 @@ fn dummy_from_vr(vr: &VR) -> PrimitiveValue{
     }
 }
 
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn dummy_from_vr_ui(){
+       assert_eq!(dummy_from_vr(&VR::AE), "ANON_AE");
+    }
+}
