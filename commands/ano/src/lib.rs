@@ -168,6 +168,53 @@ mod tests {
         ));
         obj
     }
+    pub fn create_valid_nested_sq_dicom() -> InMemDicomObject {
+        let mut obj = InMemDicomObject::new_empty();
+        obj.put(InMemElement::new(
+                Tag(0x0010, 0x0010), // PatientName
+                VR::PN,
+                PrimitiveValue::from("John^Doe"),
+        ));
+
+        obj.put(InMemElement::new(
+                Tag(0x0010, 0x0020), // PatientID
+                VR::LO,
+                PrimitiveValue::from("12345"),
+        ));
+        obj.put(InMemElement::new(
+                Tag(0x0010, 0x9999), // PatientID
+                VR::SQ,
+                DataSetSequence::from(vec![InMemDicomObject::from_element_iter([
+                        DataElement::new(
+                            Tag(0x0010, 0x0010), // PatientName
+                            VR::PN,
+                            PrimitiveValue::from("John^Doe"),
+                        ), 
+                        DataElement::new(
+                            Tag(0x0008, 0x0018), // SOPInstanceUID
+                            VR::UI,
+                            PrimitiveValue::from("1.2.3.4.5"),
+                        ), 
+                        DataElement::new(
+                            Tag(0x9999, 0x9999), // SOPInstanceUID
+                            VR::SQ,
+                            DataSetSequence::from(vec![InMemDicomObject::from_element_iter([
+                                    DataElement::new(
+                                        Tag(0x0010, 0x0010), // PatientName
+                                        VR::PN,
+                                        PrimitiveValue::from("John^Doe"),
+                                    ), 
+                                    DataElement::new(
+                                        Tag(0x0008, 0x0018), // SOPInstanceUID
+                                        VR::UI,
+                                        PrimitiveValue::from("1.2.3.4.5"),
+                                    ), 
+                            ])]),
+                            ), 
+                ])]),
+        ));
+        obj
+    }
     pub fn create_corrupted_dicom() -> InMemDicomObject{
         let mut obj = InMemDicomObject::new_empty();
 
@@ -206,4 +253,24 @@ mod tests {
         assert!(res.is_ok() || res.is_err());
     }
     
+    #[test]
+    fn correctly_remove_phi(){
+        let mut obj = create_valid_dicom();
+        let uid_map : Arc<DashMap<String, String>> = Arc::new(DashMap::new());
+        let uid_to_hash = false;
+        let res = de_identify(&mut obj, &uid_map, &uid_to_hash).unwrap();
+        assert!(obj.get(Tag(0x0010, 0x0010)).is_none());
+        assert!(obj.get(Tag(0x0010, 0x0020)).is_none());
+        assert_ne!(obj.value_at(Tag(0x0008, 0x0018)).unwrap().string().unwrap(), "1.2.3.4");
+        assert_eq!(*obj.value_at(Tag(0x0008, 0x0020)).unwrap().primitive().unwrap(), PrimitiveValue::Empty);
+    }
+
+
+    #[test]
+    fn correct_SQ_traversal() {
+        let mut obj = create_valid_dicom();
+        let uid_map : Arc<DashMap<String, String>> = Arc::new(DashMap::new());
+        let uid_to_hash = false;
+        let res = de_identify(&mut obj, &uid_map, &uid_to_hash).unwrap();
+    }
 }
