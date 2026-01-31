@@ -31,7 +31,7 @@ pub struct TagsArgs {
 }
 
 impl ArgRun for TagsArgs {
-    fn run_multiple(self, path: &str, files: Vec<PathBuf>, verbose: bool, jobs: usize) { 
+    fn run_multiple(self, _path: &str, files: Vec<PathBuf>, _verbose: bool, jobs: usize) { 
         match tag_run(
             files, 
             self.kind,

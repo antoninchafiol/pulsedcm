@@ -28,7 +28,7 @@ pub fn run(
         match TempDir::new() {
             Ok(tmp_dir) => {
                 if open <= 0 { open = 1; }
-                let tmp_path = tmp_dir.into_path();
+                let tmp_path = tmp_dir.keep();
 
                 let _ = thread_pool.install(|| -> Result<()> {
                     let _ = files.par_iter().enumerate().try_for_each(|(idx, file)| -> Result<()> {

@@ -1,6 +1,6 @@
 use std::sync::Arc;
 use dashmap::DashMap;
-use pulsedcm_core::{FileDicomObject, InMemDicomObject, PrimitiveValue, Value, Tag, VR, Result};
+use pulsedcm_core::{InMemDicomObject, PrimitiveValue, Tag, VR, Result};
 use phf::*;
 use smallvec::smallvec;
 

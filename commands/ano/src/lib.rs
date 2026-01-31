@@ -67,10 +67,7 @@ pub fn single_thread_process(
         open_file(input_path.clone())?
     };
     
-    // TODO: Check result
-    let process_result = de_identify(&mut data, uid_map, uid_to_hash);
-
-    // let data = de_identify_file(input_path.clone(), with_pixel_data, verbose, uid_map)?; 
+    de_identify(&mut data, uid_map, uid_to_hash)?;
 
     if *dry {
         if verbose {
@@ -117,10 +114,13 @@ fn de_identify(
                     let _ = data.update_value_at(tag, |val| {
                     if let Some(items) = val.items_mut() {
                         for item in items {
-                            de_identify(item, uid_map, uid_to_hash);
+                            // TODO: Could do a specific "try_de_identify" function
+                            if let Err(e) = de_identify(item, uid_map, uid_to_hash) {
+                                eprintln!("Failed to deidentify item: {}", e);
+                            }
                         }
                     }
-                    })?;
+                    });
                 },
                 // If not a sequence, check if we have the attribute/tag within our policy hashmap
                 _ => {

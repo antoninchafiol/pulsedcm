@@ -4,7 +4,6 @@ use std::{path::PathBuf};
 
 use csv::Writer;
 use pulsedcm_core::{
-    collect_dicom_files,
     open_file as open_dcm_file, 
     StandardDataDictionary,
     Tag,

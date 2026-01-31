@@ -30,7 +30,7 @@ pub struct ViewArgs {
 
 
 impl ArgRun for ViewArgs {
-    fn run_multiple(self, path: &str, files: Vec<PathBuf>, verbose: bool, jobs: usize) {
+    fn run_multiple(self, path: &str, files: Vec<PathBuf>, _verbose: bool, jobs: usize) {
         let default_out_path = PathBuf::from(&path);
         match view_run(
             files, 
