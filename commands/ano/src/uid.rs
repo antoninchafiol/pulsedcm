@@ -36,7 +36,7 @@ mod tests {
         let mut p = PrimitiveValue::from("12345");
         let h = hash_uid(&mut p);
         assert!(h.starts_with("2.25"));
-        assert!(h.contains("5994471abb01112afcc18159f6cc74b4"));
+        assert!(h.contains("119071193728809738652551802460593484980"));
     }
 
     #[test]

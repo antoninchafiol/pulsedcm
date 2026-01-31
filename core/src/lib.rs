@@ -8,6 +8,8 @@ pub use rayon::prelude::*;
 pub use dicom_core::{DataDictionary, PrimitiveValue, DicomValue, VR};
 pub use dicom_core::value::{Value, DataSetSequence};
 pub use dicom_core::header::DataElement;
+pub use dicom_core::ops::AttributeSelector;
+pub use dicom_dictionary_std;
 pub use dicom_dictionary_std::StandardDataDictionary;
 pub use dicom_object::{open_file, FileDicomObject, InMemDicomObject, mem::InMemElement, OpenFileOptions, Tag};
 pub use dicom_pixeldata::PixelDecoder;

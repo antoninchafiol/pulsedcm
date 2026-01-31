@@ -177,26 +177,26 @@ mod tests {
         ));
 
         obj.put(InMemElement::new(
-                Tag(0x0010, 0x0020), // PatientID
+                Tag(0x0008, 0x0018), // PatientID
                 VR::LO,
-                PrimitiveValue::from("12345"),
+                PrimitiveValue::from("1.2.3.4.5"),
         ));
         obj.put(InMemElement::new(
-                Tag(0x0010, 0x9999), // PatientID
+                Tag(0x0008, 0x1115), // PatientID
                 VR::SQ,
                 DataSetSequence::from(vec![InMemDicomObject::from_element_iter([
-                        DataElement::new(
+                        InMemElement::new(
                             Tag(0x0010, 0x0010), // PatientName
                             VR::PN,
                             PrimitiveValue::from("John^Doe"),
                         ), 
-                        DataElement::new(
+                        InMemElement::new(
                             Tag(0x0008, 0x0018), // SOPInstanceUID
                             VR::UI,
                             PrimitiveValue::from("1.2.3.4.5"),
                         ), 
                         DataElement::new(
-                            Tag(0x9999, 0x9999), // SOPInstanceUID
+                            Tag(0x0008, 0x1199), // SOPInstanceUID
                             VR::SQ,
                             DataSetSequence::from(vec![InMemDicomObject::from_element_iter([
                                     DataElement::new(
@@ -268,9 +268,42 @@ mod tests {
 
     #[test]
     fn correct_SQ_traversal() {
-        let mut obj = create_valid_dicom();
+        let mut obj = create_valid_nested_sq_dicom();
         let uid_map : Arc<DashMap<String, String>> = Arc::new(DashMap::new());
         let uid_to_hash = false;
         let res = de_identify(&mut obj, &uid_map, &uid_to_hash).unwrap();
+        // First layer
+        assert!(obj.value_at(AttributeSelector::from(Tag(0x0010, 0x0010))).is_err());
+        assert_ne!(obj.value_at(Tag(0x0008, 0x0018)).unwrap().string().unwrap(), "1.2.3.4");
+        assert!(obj.get(Tag(0x0008, 0x1115)).is_some(), "{:?}", obj.get(Tag(0x0008, 0x1115)));
+
+        // Second layer
+        assert!(obj.value_at(AttributeSelector::from((
+                        Tag(0x0008, 0x1115),
+                        0,
+                        Tag(0x0010, 0x0010)
+        ))).is_err());
+        assert_ne!(obj.value_at(AttributeSelector::from((
+                        Tag(0x0008, 0x1115),
+                        0,
+                        Tag(0x0008, 0x0018)
+        ))).unwrap().string().unwrap(), "1.2.3.4");
+
+        // Third layer
+        assert!(obj.value_at(AttributeSelector::from((
+                        Tag(0x0008, 0x1115),
+                        0,
+                        Tag(0x0008, 0x1199), 
+                        0,
+                        Tag(0x0010, 0x0010)
+
+        ))).is_err());
+        assert_ne!(obj.value_at(AttributeSelector::from((
+                        Tag(0x0008, 0x1115),
+                        0,
+                        Tag(0x0008, 0x1199), 
+                        0,
+                        Tag(0x0008, 0x0018)
+        ))).unwrap().string().unwrap(), "1.2.3.4");
     }
 }
