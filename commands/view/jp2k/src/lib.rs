@@ -17,7 +17,7 @@ This library brings its own libopenjpeg, which is statically linked. If you just
 
 ## Usage
 
-```rust,no_run
+```rust,ignore
 fn main() {
     let bytes = include_bytes!("./rust-logo-512x512-blk.jp2");
 
