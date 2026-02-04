@@ -12,13 +12,13 @@ pub fn threading_handling(
     output_path: PathBuf,
     dry: &mut bool, 
     with_pixel_data: bool,
-    workers: usize,
+    _workers: usize,
     batch: usize,
     verbose: bool, 
     uid_to_hash: &bool
     ) -> Result<()> {
     let thread_pool = rayon::ThreadPoolBuilder::new()
-        .num_threads(workers)
+        // .num_threads(workers)
         .build()?;
 
     // Setup the hasmap 
@@ -88,6 +88,12 @@ pub fn single_thread_process(
             return Ok(());
         }
     } else {
+        if !output_path.exists(){
+            match std::fs::create_dir(&output_path){
+                Ok(_) => {},
+                Err(e) => eprintln!("Couldn't create the output folder: {e}"),
+            }
+        }
         if !output_path.is_dir() {
             eprintln!("Output path shouldn't be a file");
             return Ok(());

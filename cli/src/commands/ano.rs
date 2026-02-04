@@ -12,9 +12,11 @@ pub struct AnoArgs {
     #[arg(long)]
     out: Option<PathBuf>,
 
+    /// DEPRECATED: Numbers of thread to work with (Now handled directly)
     #[arg(short, long, default_value_t = 1)]
     workers: usize,
 
+    /// Number of filesto limit per worker
     #[arg(short, long, default_value_t = 1)]
     batch: usize,
     /// Show the changed args for the file
