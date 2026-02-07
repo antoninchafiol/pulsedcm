@@ -62,24 +62,6 @@ pub struct SerializableDicomEntry {
     pub value: String,
 }
 
-/// Allow to determine what's the optimum number of jobs
-// TODO: Rewrite
-pub fn jobs_handling(jobs: Option<usize>, max_file: usize) -> usize {
-    let j = jobs.unwrap_or_else(|| {
-        return 1;
-    });
-    if j <= 0 {
-        // MAX NUMBER OF THREADS POSSIBLE BY MACHINEa
-        if max_file > rayon::max_num_threads() {
-            return rayon::max_num_threads();
-        } else {
-            return max_file;
-        }
-    } else {
-        return j;
-    }
-}
-
 /// Prompt a "yes or no" question to the user
 pub fn ask_yes_no(question: &str) -> bool {
     print!("{} Y/N: ", question);

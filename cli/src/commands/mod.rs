@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use clap::Subcommand;
-use pulsedcm_core::{jobs_handling, collect_dicom_files};
+use pulsedcm_core::{collect_dicom_files};
 
 // ==== Commands ==== 
 mod tags;
@@ -39,14 +39,14 @@ pub struct CliCommand<'a> {
 
 }
 impl<'a> CliCommand<'a> {
-    pub fn new(path: &'a str, verbose: bool, jobs: Option<usize>) -> Self {
+    pub fn new(path: &'a str, verbose: bool, _jobs: Option<usize>) -> Self {
         let files = match collect_dicom_files(path){
             Ok(o) => o, 
             Err(e) => panic!("Couldn't determine a file collection with the provided path: {}", e),
         };
         Self {
             path    : path,
-            jobs    : jobs_handling(jobs, files.len()),
+            jobs    : 0,
             files   : files,
             verbose : verbose,
         }
