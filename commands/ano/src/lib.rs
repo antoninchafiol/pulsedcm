@@ -21,7 +21,6 @@ pub fn threading_handling(
     ) -> Result<()> {
 
     if !output_path.exists(){
-        println!("{:?}", output_path);
         match std::fs::create_dir(&output_path){
             Ok(_) => {},
             Err(e) => eprintln!("Couldn't create the output folder: {e}"),
@@ -65,15 +64,18 @@ pub fn threading_handling(
     let files_success= Arc::new(AtomicUsize::new(0));
     let files_failed = Arc::new(AtomicUsize::new(0));
     if let Some((first, rest)) = files.split_first(){
-        if *dry {
-            single_thread_process(first.into(), &mut output_path.clone(),verbose ,dry, with_pixel_data, &uid_map, uid_to_hash)?;
-        }
-        *dry = false;
-        let chunks = if batch > 1 {
+        let mut chunks = if batch > 1 {
             rest.chunks(batch).collect::<Vec<&[PathBuf]>>()
         } else {
             vec![rest]
         };
+        if *dry {
+            single_thread_process(first.into(), &mut output_path.clone(),verbose ,dry, with_pixel_data, &uid_map, uid_to_hash)?;
+            *dry = false;
+        }
+        else {
+            chunks = files.chunks(batch).collect::<Vec<&[PathBuf]>>();
+        }
         for chunk in chunks {
             let _ = thread_pool.install(|| {
                 let _ = chunk.par_iter().try_for_each(

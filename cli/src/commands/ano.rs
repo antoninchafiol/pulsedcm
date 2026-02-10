@@ -17,7 +17,7 @@ pub struct AnoArgs {
     workers: usize,
 
     /// Number of filesto limit per worker
-    #[arg(short, long, default_value_t = 0)]
+    #[arg(short, long, default_value_t = 1)]
     batch: usize,
     /// Show the changed args for the file
     /// If multiple files it'll stop processing after the 1st to give an output
