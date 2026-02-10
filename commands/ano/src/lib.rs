@@ -1,12 +1,14 @@
-use std::{path::PathBuf, sync::Arc};
+use std::{path::PathBuf, sync::{atomic::AtomicUsize, Arc}, time::Instant, usize};
 use pulsedcm_core::*;
-use dashmap::DashMap; 
+use dashmap::DashMap;
+use uuid::Uuid; 
 
 pub mod models;
 pub mod uid;
 
 use crate::models::{DEID_MAP};
 
+// Charged to invoke rayon with the pool of files
 pub fn threading_handling(
     files: Vec<PathBuf>, 
     output_path: PathBuf,
@@ -17,6 +19,41 @@ pub fn threading_handling(
     verbose: bool, 
     uid_to_hash: &bool
     ) -> Result<()> {
+
+    if !output_path.exists(){
+        println!("{:?}", output_path);
+        match std::fs::create_dir(&output_path){
+            Ok(_) => {},
+            Err(e) => eprintln!("Couldn't create the output folder: {e}"),
+        }
+    }
+    if !output_path.is_dir() {
+        eprintln!("Output path shouldn't be a file");
+        return Ok(());
+    }
+    pulsedcm_core::tracing_subscriber::fmt()
+        .json()
+        .with_writer(std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open("log.json")
+            .unwrap()
+        )
+        .init();
+
+    // Compute the metadata for logging
+    let job_id = Uuid::new_v4().to_string();
+    let start_ms = Instant::now(); // Measure time of exec
+
+
+    let span = info_span!("job",
+        job_id = %job_id,
+        action = "ano",
+        files_total = files.len()
+    );
+
+    let _enter = span.enter();
+
     let thread_pool = rayon::ThreadPoolBuilder::new()
         // .num_threads(workers)
         .build()?;
@@ -25,6 +62,8 @@ pub fn threading_handling(
     // TODO: Might need a better way to hashmap it
     let uid_map : Arc<DashMap<String, String>> = Arc::new(DashMap::new());
 
+    let files_success= Arc::new(AtomicUsize::new(0));
+    let files_failed = Arc::new(AtomicUsize::new(0));
     if let Some((first, rest)) = files.split_first(){
         if *dry {
             single_thread_process(first.into(), &mut output_path.clone(),verbose ,dry, with_pixel_data, &uid_map, uid_to_hash)?;
@@ -38,18 +77,35 @@ pub fn threading_handling(
         for chunk in chunks {
             let _ = thread_pool.install(|| {
                 let _ = chunk.par_iter().try_for_each(
-                    |file: &PathBuf| -> Result<()> {
+                    |files: &PathBuf| -> Result<()>{
                         let uid_map = Arc::clone(&uid_map);
-                        single_thread_process(file.into(), &mut output_path.clone(), verbose , dry, with_pixel_data, &uid_map, uid_to_hash)?;
+                        match single_thread_process(files.into(), &mut output_path.clone(), verbose , dry, with_pixel_data, &uid_map, uid_to_hash){
+                            Ok(_o) => {files_success.fetch_add(1, std::sync::atomic::Ordering::Relaxed)},
+                            Err(_e)=> {files_failed.fetch_add(1, std::sync::atomic::Ordering::Relaxed)},
+                        };
                         Ok(())
                     });
             });
         }
     }
+    let files_success = files_success.load(std::sync::atomic::Ordering::Relaxed) as u64;
+    let files_failed = files_failed.load(std::sync::atomic::Ordering::Relaxed) as u64;
+    let duration_ms = start_ms.elapsed().as_millis() as u64;
 
+    let status = if files_failed == 0 {"success"}
+                 else if files_success > 0 {"partial_success"}
+                 else {"failed"};
+    info!(
+        files_success,
+        files_failed,
+        duration_ms,
+        status,
+        "job_completed"
+    );
     Ok(())
 }
 
+// Handle the reading of file -> process -> write
 pub fn single_thread_process(
     input_path: PathBuf,
     output_path: &mut PathBuf,
@@ -88,16 +144,6 @@ pub fn single_thread_process(
             return Ok(());
         }
     } else {
-        if !output_path.exists(){
-            match std::fs::create_dir(&output_path){
-                Ok(_) => {},
-                Err(e) => eprintln!("Couldn't create the output folder: {e}"),
-            }
-        }
-        if !output_path.is_dir() {
-            eprintln!("Output path shouldn't be a file");
-            return Ok(());
-        }
         output_path.push(filename);
         data.write_to_file(&output_path)?;
     }

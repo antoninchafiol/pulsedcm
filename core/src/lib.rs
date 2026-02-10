@@ -18,12 +18,18 @@ pub use std::fs::{File, create_dir};
 pub use std::path::Path;
 pub use std::time::{SystemTime, UNIX_EPOCH};
 
+pub use tracing::{info, info_span, Level};
+pub use tracing_subscriber;
+pub use tracing_subscriber::fmt::format::FmtSpan;
+
 use walkdir::{self,  WalkDir};
+
 
 mod errors;
 pub use errors::{PulseError, PulseErrorKind};
 
 pub type Result<T> = std::result::Result<T, PulseError>;
+
 
 /// List all dcm files recursively from the given path 
 pub fn collect_dicom_files(user_path: &str) -> Result<Vec<PathBuf>> {

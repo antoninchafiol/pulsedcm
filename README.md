@@ -1,4 +1,7 @@
 # Project Overview
+
+WARNING: You're currently on the performance branch, if you're looking for the clinical specific features such as complete compliance of DICOM Chapter E, Please refer to [the clinical branch](https://github.com/antoninchafiol/pulsedcm/tree/clinical) instead
+
 **pulsedcm** is a high-performance, memory-safe Rust toolkit for DICOM automation and AI-ready workflows.  
 Designed for researchers, imaging scientists, and developers working with large volumes of medical imaging data.
 
@@ -172,13 +175,21 @@ pulsedcm <PATH> ano [OPTIONS]
 - [x] : Feature-Gated Modules: creating crates modules to add for a personalized executable.
 - [x] : Optimize: tags
 - [x] : Optimize: view (Doesn't need for v0.2)
-- [x] : Optimize: ano  (Doesn't need for v0.2)
 
 ## Advanced (Goals for v0.3)
-- [ ] : codecs integration (JPEG 2000 Lossless)
-- [ ] : API development
+- [x] : codecs integration (JPEG 2000 Lossless)
 
-## Extensions & Polish
+
+## Optimization (V0.4p)
+- [x] : Optimize deid
+
+## Polish (v0.5p)
+- [ ] : Logging
+- [ ] : Demo and full 
+
+
+## Additionnals
+- [ ] : API development
 - [ ] : PACS Integration
 - [ ] : Implement DICOMWeb
 </details>
