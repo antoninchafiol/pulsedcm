@@ -1,7 +1,8 @@
 [package]
 name = "pulsedcm-cli"
+authors = ["Antonin Chafiol <antonin.chafiol@gmail.com"]
 description = "CLI part of pulsedcm"
-version = "0.2.0"
+version = "0.4.0p"
 edition = "2021"
 
 [dependencies]
