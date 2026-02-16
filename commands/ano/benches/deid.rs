@@ -18,7 +18,7 @@ fn criterion_bench(c: &mut Criterion){
         let uid_to_hash = false;
         threading_handling(
             mg_data.clone(), 
-            PathBuf::from("mg_bench"),
+            PathBuf::from(bpath.parent().unwrap().parent().unwrap().join("mg_bench")),
             &mut b,
             true, 
             0,
@@ -32,7 +32,7 @@ fn criterion_bench(c: &mut Criterion){
         let uid_to_hash = false;
         threading_handling(
             mr_data.clone(), 
-            PathBuf::from("mr_bench"),
+            PathBuf::from(bpath.parent().unwrap().parent().unwrap().join("mr_bench")),
             &mut b,
             true, 
             0,
@@ -46,7 +46,7 @@ fn criterion_bench(c: &mut Criterion){
         let uid_to_hash = false;
         threading_handling(
             ct_data.clone(), 
-            PathBuf::from("ct_bench"),
+            PathBuf::from(bpath.parent().unwrap().parent().unwrap().join("ct_bench")),
             &mut b,
             true, 
             0,

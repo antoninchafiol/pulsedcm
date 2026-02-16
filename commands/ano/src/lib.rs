@@ -38,7 +38,7 @@ pub fn threading_handling(
             .open("log.json")
             .unwrap()
         )
-        .init();
+        .try_init().ok();
 
     // Compute the metadata for logging
     let job_id = Uuid::new_v4().to_string();
