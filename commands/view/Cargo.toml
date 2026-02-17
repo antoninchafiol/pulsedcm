@@ -9,9 +9,12 @@ edition = "2021"
 pulsedcm-core = { path = "../../core" }
 rayon = "1.10.0"
 tempfile = "3.20.0"
-jp2k = {path = "jp2k"}
-image = "0.25.6"
+image = { version = "0.25.6", optional = true }
+jp2k = { path = "jp2k", optional = true }
 
 [build-dependencies]
-bindgen = "0.69"
-clang-sys = "1.8"
+bindgen = { version = "0.69", optional = true }
+clang-sys = { version = "1.8", optional = true }
+
+[features]
+jp2k = ["dep:jp2k", "bindgen", "clang-sys", "image"]

@@ -46,6 +46,7 @@ pub enum PulseErrorKind {
     Threading(rayon::ThreadPoolBuildError),
     ThreadPoison(String),
     ImageError(image::ImageError),
+    #[cfg(feature = "jp2k")]
     CodecError(jp2k::err::Error),
     CSV(csv::Error),
     // Additional checks
@@ -63,6 +64,7 @@ impl Display for PulseErrorKind {
             Self::Threading(e) => write!(f, "Threading Error: {}", e),
             Self::ThreadPoison(_) =>  write!(f, "Thread Poisoned"),
             Self::ImageError(e) => write!(f, "Image Error: {}", e),
+            #[cfg(feature = "jp2k")]
             Self::CodecError(e) => write!(f, "Codec Error: {}", e),
             Self::CSV(e) => write!(f, "CSV Error: {}", e), 
             Self::UnsupportedPixelData => write!(f, "Unsupported pixel data"),
@@ -80,6 +82,7 @@ impl Error for PulseErrorKind {
             Self::Threading(s) => Some(s),
             Self::ThreadPoison(_) => None,
             Self::ImageError(s) => Some(s),
+            #[cfg(feature = "jp2k")]
             Self::CodecError(s) => Some(s),
             Self::CSV(s) => Some(s),
 
@@ -180,6 +183,7 @@ impl From<csv::Error> for PulseError {
     }
 }
 
+#[cfg(feature = "jp2k")]
 impl From<jp2k::err::Error> for PulseError {
     fn from(e: jp2k::err::Error) -> Self { Self { 
             kind: PulseErrorKind::CodecError(e), 

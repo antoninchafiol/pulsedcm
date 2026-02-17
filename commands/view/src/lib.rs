@@ -5,7 +5,9 @@ use std::process::Command;
 
 use tempfile::TempDir;
 
+#[cfg(feature = "jp2k")]
 use jp2k::{Codec, DecodeParams, ImageBuffer, Stream};
+#[cfg(feature = "jp2k")]
 use image;
 
 pub fn run(
@@ -83,8 +85,12 @@ fn view_processing(
 
     let ts = obj.meta().transfer_syntax();
     if ts == "1.2.840.10008.1.2.4.90" || ts == "1.2.840.10008.1.2.4.91"{
+        #[cfg(feature = "jp2k")]
         let buff: Vec<u8> = build_byte_buffer(obj)?;
+        #[cfg(feature = "jp2k")]
         handle_byte_to_jp2k(buff, output_path.to_str().unwrap())?;
+        #[cfg(not(feature = "jp2k"))]
+        eprintln!("JP2K Encoding without the jp2k feature enabled, skipping the file");
 
     } else {
         let image = obj.decode_pixel_data()?;
@@ -132,6 +138,7 @@ fn build_byte_buffer(obj: FileDicomObject<InMemDicomObject>) -> Result<Vec<u8>> 
         buff
 }
 
+#[cfg(feature = "jp2k")]
 fn handle_byte_to_jp2k(buff: Vec<u8>, output_path: &str) -> Result<()> {
     let stream = Stream::from_bytes(&buff)?;
     let codec = Codec::create(jp2k::CODEC_FORMAT::OPJ_CODEC_J2K)?;
