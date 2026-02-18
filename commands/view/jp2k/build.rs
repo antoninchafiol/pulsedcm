@@ -1,12 +1,15 @@
+#[cfg(feature = "jp2k")]
 extern crate bindgen;
 
+#[cfg(feature = "jp2k")]
 use std::env;
+#[cfg(feature = "jp2k")]
 use std::path::PathBuf;
 
-#[cfg(feature = "docs-rs")]
+#[cfg(any(feature = "docs-rs", not(feature = "jp2k")))]
 fn main() {}
 
-#[cfg(not(feature = "docs-rs"))]
+#[cfg(not(any(feature = "docs-rs", not(feature = "jp2k"))))]
 fn main() {
     println!("cargo:rerun-if-changed=build.rs");
 

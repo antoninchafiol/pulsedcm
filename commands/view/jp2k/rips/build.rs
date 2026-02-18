@@ -1,6 +1,8 @@
 #[derive(Debug)]
+#[cfg(feature = "jp2k")]
 struct IgnoreMacros(std::collections::HashSet<&'static str>);
 
+#[cfg(feature = "jp2k")]
 impl bindgen::callbacks::ParseCallbacks for IgnoreMacros {
     fn will_parse_macro(&self, name: &str) -> bindgen::callbacks::MacroParsingBehavior {
         if self.0.contains(name) {
@@ -12,10 +14,10 @@ impl bindgen::callbacks::ParseCallbacks for IgnoreMacros {
 }
 
 
-#[cfg(feature = "docs-rs")]
+#[cfg(any(feature = "docs-rs", not(feature = "jp2k")))]
 fn main() {}
 
-#[cfg(not(feature = "docs-rs"))]
+#[cfg(not(any(feature = "docs-rs", not(feature = "jp2k"))))]
 fn main() {
     let pkg = pkg_config::probe_library("vips").expect("Could not find libvips");
 

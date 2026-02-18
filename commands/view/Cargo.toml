@@ -17,4 +17,4 @@ bindgen = { version = "0.69", optional = true }
 clang-sys = { version = "1.8", optional = true }
 
 [features]
-jp2k = ["dep:jp2k", "bindgen", "clang-sys", "image"]
+jp2k = ["dep:jp2k", "bindgen", "clang-sys", "image", "jp2k/jp2k"]

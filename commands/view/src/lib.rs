@@ -123,6 +123,7 @@ fn open_image(path: &str) {
 }
 
 
+#[cfg(feature = "jp2k")]
 fn build_byte_buffer(obj: FileDicomObject<InMemDicomObject>) -> Result<Vec<u8>>  {
     let pixel_data = obj.element_by_name("PixelData").unwrap();
     let buff: Result<Vec<u8>> = match pixel_data.value() {

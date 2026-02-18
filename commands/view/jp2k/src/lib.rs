@@ -1,3 +1,6 @@
+#![cfg(feature = "jp2k")]
+
+
 /*!
 
 # Rust bindings to OpenJPEG
@@ -93,14 +96,17 @@ pub mod err {
 mod ffi;
 
 #[cfg(not(feature = "docs-rs"))]
+#[cfg(feature = "jp2k")]
 mod ffi;
 
 use std::ffi::CString;
 use std::os::raw::c_void;
 use std::ptr::{self, NonNull};
 
+#[cfg(feature = "jp2k")]
 pub use ffi::{CODEC_FORMAT, COLOR_SPACE};
 
+#[cfg(feature = "jp2k")]
 struct InnerDecodeParams(ffi::opj_dparameters);
 
 impl Default for InnerDecodeParams {

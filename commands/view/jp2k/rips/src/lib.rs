@@ -1,3 +1,4 @@
+#![cfg(feature = "jp2k")]
 
 #[cfg(feature = "docs-rs")]
 #[path = "ffi.ref.rs"]
