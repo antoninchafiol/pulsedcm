@@ -9,7 +9,8 @@ permissions:
   contents: write
 
 jobs:
-  build:
+  # 1. ====== JP2K Build ======
+  build-jp2k:
     name: Build (Ubuntu)
     runs-on: ubuntu-latest
 
@@ -28,22 +29,64 @@ jobs:
           override: true
 
       - name: Build (release)
-        run: cargo build --release
+        run: cargo build --release --features jp2k
 
       - name: Package (Linux)
         run: |
           TAG=${{ github.ref_name }}
-          tar -C target/release -czf pulsedcm-${TAG}-linux-x86_64.tar.gz pulsedcm-cli
+          tar -C target/release -czf pulsedcm-${TAG}-jp2k-linux-x86_64.tar.gz pulsedcm-cli
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
           name: pulsedcm-linux
-          path: pulsedcm-${{ github.ref_name }}-linux-x86_64.tar.gz
+          path: pulsedcm-${{ github.ref_name }}-jp2k-linux-x86_64.tar.gz
 
+  # 2. ===== Build (No jp2k) for all OSs ====
+  build:
+      name: Build for ${{ matrix.os }}
+      runs-on: ${{ matrix.os }}
+      strategy:
+        matrix:
+          os: [ubuntu-latest, windows-latest, macos-latest]
+
+      steps:
+        - uses: actions/checkout@v4
+
+        - name: Install Rust (stable)
+          uses: actions-rs/toolchain@v1
+          with:
+            toolchain: stable
+            override: true
+
+        - name: Build (release)
+          run: cargo build --release
+
+        - name: Package (macOS / Linux)
+          if: runner.os != 'Windows'
+          run: |
+            TAG=${{ github.ref_name }}
+            OSNAME="${{ runner.os }}"
+            os_lower=$(echo "$OSNAME" | tr '[:upper:]' '[:lower:]')
+            tar -C target/release -czf pulsedcm-${TAG}-${os_lower}-x86_64.tar.gz pulsedcm-cli
+
+        - name: Package (Windows)
+          if: runner.os == 'Windows'
+          shell: powershell
+          run: |
+            $tag = '${{ github.ref_name }}'
+            Compress-Archive -Path target\release\pulsedcm-cli.exe -DestinationPath "pulsedcm-$tag-windows-x86_64.zip"
+
+        - name: Upload build artifact
+          uses: actions/upload-artifact@v4
+          with:
+            name: pulsedcm-${{ matrix.os }}
+            path: pulsedcm-${{ github.ref_name }}-*
+
+  # 3. ==== Create Releases ====
   create_release:
     name: Create Release and attach artifacts
-    needs: build
+    needs: [build-jp2k, build]
     runs-on: ubuntu-latest
     steps:
       - name: Download all artifacts

@@ -31,6 +31,14 @@ To compile and build as is:
 `cargo build --release`
 You'll then find the binary at `pulsedcm/target/release/pulsedcm-cli`
 
+#### Features
+
+Pulsedcm can implement features for modifying it's behaviour, and you can activate those by adding `--features <name>`
+Current implemented features:
+|Name|Description|Associated Commands|Active by default|
+|---|---|---|
+|jp2k| Activate jp2k encoding/decoding| view| no|
+
 
 
 
@@ -130,30 +138,12 @@ pulsedcm <PATH> ano [OPTIONS]
 
 | Option              | Description                                                                                                                    |
 | ------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| `--action <ACTION>` | See **Action Types** table below.                                                                                              |
-| `--policy <POLICY>` | See **Policy Types** table below.                                                                                              |
-| `--jobs <NUMBER>`   | Number of threads to launch to process (0 or less = all available threads)                                                             |
+| `--batch <NUMBER>`  | Number of filesto limit per worker                                                             |
 | `--out <OUT>`       | Output directory to save anonymized files. If omitted, input files are overwritten in-place. Must be a directory if specified. |
+| `-u`, `--uid-hash`  | Determine if we hash the UID or preserve UID as requested in Chapter E|
+|`--with-pixel-data`  | Read now include PixelData and tags past it Otherwise it'd stop before PixelData|
 | `-d`, `--dry`       | Show the changed args for the file. If multiple files, stops after the first to display output.                                |
-| `-v`, `--verbose`   | Show all changed values.                                                                                                       |
 | `-h`, `--help`      | Print this help message.                                                                                                       |
-
-#### Action Types
-
-| Action    | Description                                        |
-| --------- | -------------------------------------------------- |
-| `replace` | Replace the tag’s value with a dummy value.        |
-| `zero`    | Replace the tag’s value with a zero-length string. |
-| `remove`  | Remove the tag entirely.                           |
-
-#### Policy Types
-
-| Policy     | Description                                            |
-| ---------- | ------------------------------------------------------ |
-| `basic`    | Remove only the required PHI elements (safe profile).  |
-| `moderate` | Also remove institution and device information.        |
-| `strict`   | Maximum removal: leaves only technical/essential data. |
-
 
 
 </details>
@@ -161,6 +151,7 @@ pulsedcm <PATH> ano [OPTIONS]
 
 <details>
 <summary> <h2> 🎯 Roadmap & Progress </h2> </summary>
+
 
 ## Base of CLI (Goals for v0.1)
 - [x] tags:
